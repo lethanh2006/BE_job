@@ -1,0 +1,200 @@
+[
+  {
+    "id": 1,
+    "title": "Backend Developer (.NET)",
+    "companyId": 1,
+    "company": "Nova Technology",
+    "location": "TP. Hồ Chí Minh",
+    "salaryMin": 1800,
+    "salaryMax": 3000,
+    "level": "Middle",
+    "workMode": "Hybrid",
+    "category": "Lập trình Backend",
+    "summary": "Xây dựng các dịch vụ lõi cho nền tảng thương mại điện tử phục vụ hàng triệu người dùng.",
+    "description": [
+      "Thiết kế và phát triển REST API bằng ASP.NET Core theo kiến trúc phân lớp.",
+      "Tối ưu truy vấn PostgreSQL, theo dõi hiệu năng và xử lý các điểm nghẽn của hệ thống.",
+      "Phối hợp cùng Product, Frontend và QA để giao sản phẩm theo từng sprint."
+    ],
+    "requirements": [
+      "Có từ 2 năm kinh nghiệm làm việc với C# và .NET.",
+      "Nắm vững OOP, SOLID, REST API và cơ sở dữ liệu quan hệ.",
+      "Có tư duy sản phẩm, chủ động trao đổi và review code."
+    ],
+    "benefits": [
+      "Thưởng hiệu suất hai lần mỗi năm.",
+      "Ngân sách học tập 15 triệu đồng/năm.",
+      "Làm việc linh hoạt hai ngày tại nhà mỗi tuần."
+    ],
+    "postedAt": "2026-09-25T00:00:00Z",
+    "deadline": "2026-10-31T23:59:59Z",
+    "status": "Published",
+    "featured": true,
+    "skills": ["C#", "ASP.NET Core", "PostgreSQL"]
+  },
+  {
+    "id": 2,
+    "title": "Frontend Developer (Next.js)",
+    "companyId": 2,
+    "company": "Lumi Studio",
+    "location": "Hà Nội",
+    "salaryMin": 1500,
+    "salaryMax": 2500,
+    "level": "Middle",
+    "workMode": "Remote",
+    "category": "Lập trình Frontend",
+    "summary": "Kiến tạo trải nghiệm web nhanh, chỉn chu cho bộ sản phẩm quản trị doanh nghiệp thế hệ mới.",
+    "description": [
+      "Phát triển giao diện bằng Next.js App Router và TypeScript.",
+      "Xây dựng component có khả năng tái sử dụng và đảm bảo accessibility.",
+      "Làm việc cùng Designer để chuyển thiết kế thành trải nghiệm nhất quán."
+    ],
+    "requirements": [
+      "Có kinh nghiệm thực tế với React và TypeScript.",
+      "Hiểu server component, client component và chiến lược caching của Next.js.",
+      "Chú ý tới chi tiết, responsive và hiệu năng trình duyệt."
+    ],
+    "benefits": [
+      "Làm việc từ xa toàn thời gian.",
+      "Thiết bị làm việc theo nhu cầu.",
+      "Review lương mỗi 6 tháng."
+    ],
+    "postedAt": "2026-09-24T00:00:00Z",
+    "deadline": "2026-11-05T23:59:59Z",
+    "status": "Published",
+    "featured": true,
+    "skills": ["TypeScript", "React", "Next.js"]
+  },
+  {
+    "id": 3,
+    "title": "DevOps Engineer",
+    "companyId": 3,
+    "company": "CloudNine",
+    "location": "Đà Nẵng",
+    "salaryMin": 2000,
+    "salaryMax": 3500,
+    "level": "Senior",
+    "workMode": "Hybrid",
+    "category": "DevOps & Cloud",
+    "summary": "Chuẩn hóa nền tảng triển khai cloud và giúp đội ngũ giao sản phẩm an toàn hơn mỗi ngày.",
+    "description": [
+      "Vận hành hạ tầng AWS và cụm Kubernetes cho các môi trường.",
+      "Xây dựng pipeline CI/CD, hệ thống quan sát và cảnh báo chủ động.",
+      "Đồng hành cùng developer để cải thiện độ tin cậy của dịch vụ."
+    ],
+    "requirements": [
+      "Từ 3 năm kinh nghiệm DevOps, SRE hoặc Platform Engineering.",
+      "Thành thạo Docker, Linux và ít nhất một nền tảng cloud.",
+      "Có kinh nghiệm Infrastructure as Code là lợi thế."
+    ],
+    "benefits": [
+      "Gói chứng chỉ cloud hằng năm.",
+      "Bảo hiểm sức khỏe cao cấp cho gia đình.",
+      "ESOP theo thâm niên và đóng góp."
+    ],
+    "postedAt": "2026-09-22T00:00:00Z",
+    "deadline": "2026-10-28T23:59:59Z",
+    "status": "Published",
+    "featured": true,
+    "skills": ["Docker", "Kubernetes", "AWS"]
+  },
+  {
+    "id": 4,
+    "title": "Product Designer",
+    "companyId": 4,
+    "company": "Mơ Lab",
+    "location": "TP. Hồ Chí Minh",
+    "salaryMin": 1200,
+    "salaryMax": 2200,
+    "level": "Middle",
+    "workMode": "Onsite",
+    "category": "Thiết kế sản phẩm",
+    "summary": "Nghiên cứu và thiết kế sản phẩm tài chính thân thiện cho thế hệ người dùng trẻ.",
+    "description": [
+      "Dẫn dắt quy trình thiết kế từ khám phá vấn đề tới bàn giao.",
+      "Thực hiện phỏng vấn, usability test và tổng hợp insight.",
+      "Phát triển design system cùng đội ngũ Frontend."
+    ],
+    "requirements": [
+      "Portfolio thể hiện rõ tư duy giải quyết vấn đề.",
+      "Thành thạo Figma và prototyping.",
+      "Giao tiếp tốt và biết bảo vệ quyết định bằng dữ liệu."
+    ],
+    "benefits": [
+      "Không gian làm việc sáng tạo tại trung tâm.",
+      "Creative day mỗi tháng.",
+      "Du lịch công ty hai lần mỗi năm."
+    ],
+    "postedAt": "2026-09-20T00:00:00Z",
+    "deadline": "2026-11-12T23:59:59Z",
+    "status": "Published",
+    "featured": false,
+    "skills": ["Figma", "UX Research", "Design System"]
+  },
+  {
+    "id": 5,
+    "title": "Data Analyst",
+    "companyId": 5,
+    "company": "Green Basket",
+    "location": "Hà Nội",
+    "salaryMin": 1000,
+    "salaryMax": 1800,
+    "level": "Junior",
+    "workMode": "Hybrid",
+    "category": "Dữ liệu",
+    "summary": "Biến dữ liệu vận hành thành insight giúp chuỗi bán lẻ tăng trưởng bền vững.",
+    "description": [
+      "Xây dựng dashboard theo dõi kinh doanh và vận hành.",
+      "Phân tích xu hướng, phát hiện bất thường và trình bày khuyến nghị.",
+      "Chuẩn hóa định nghĩa chỉ số cùng các phòng ban."
+    ],
+    "requirements": [
+      "Tư duy phân tích tốt và sử dụng SQL thành thạo.",
+      "Có kinh nghiệm với một công cụ trực quan hóa dữ liệu.",
+      "Biết Python hoặc thống kê ứng dụng là lợi thế."
+    ],
+    "benefits": [
+      "Mentor riêng trong ba tháng đầu.",
+      "Thưởng theo hiệu quả kinh doanh.",
+      "12 ngày làm việc từ xa mỗi quý."
+    ],
+    "postedAt": "2026-09-18T00:00:00Z",
+    "deadline": "2026-10-30T23:59:59Z",
+    "status": "Published",
+    "featured": false,
+    "skills": ["SQL", "Power BI", "Python"]
+  },
+  {
+    "id": 6,
+    "title": "QA Automation Engineer",
+    "companyId": 6,
+    "company": "Finora",
+    "location": "TP. Hồ Chí Minh",
+    "salaryMin": 1400,
+    "salaryMax": 2400,
+    "level": "Middle",
+    "workMode": "Hybrid",
+    "category": "Kiểm thử phần mềm",
+    "summary": "Xây dựng nền tảng kiểm thử tự động cho sản phẩm thanh toán có độ tin cậy cao.",
+    "description": [
+      "Thiết kế test strategy và bộ kiểm thử tự động cho web/API.",
+      "Tích hợp kiểm thử vào pipeline và phân tích nguyên nhân lỗi.",
+      "Phối hợp với developer để nâng khả năng kiểm thử của hệ thống."
+    ],
+    "requirements": [
+      "Từ 2 năm kinh nghiệm automation testing.",
+      "Có kinh nghiệm với Playwright, Cypress hoặc Selenium.",
+      "Hiểu API, SQL và quy trình CI/CD."
+    ],
+    "benefits": [
+      "Lương tháng 13 và thưởng dự án.",
+      "Bảo hiểm sức khỏe toàn diện.",
+      "Giờ làm linh hoạt."
+    ],
+    "postedAt": "2026-09-17T00:00:00Z",
+    "deadline": "2026-11-08T23:59:59Z",
+    "status": "Published",
+    "featured": false,
+    "skills": ["Playwright", "API Testing", "CI/CD"]
+  }
+]

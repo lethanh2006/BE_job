@@ -1,98 +1,90 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# JobBoard Backend (NestJS)
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Bản chuyển đổi backend JobBoard từ ASP.NET Core (`BE_c#`) sang NestJS + TypeScript.
+Giữ nguyên kiến trúc phân lớp, route, JSON contract và quy tắc nghiệp vụ để frontend
+(`fe/`) dùng được mà không cần sửa.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Cấu trúc
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
+```text
+src/
+  domain/          Entity, value object, exception và quy tắc nghiệp vụ (không phụ thuộc framework)
+  application/     Use case (service), DTO và abstraction (abstract class dùng làm DI token)
+  infrastructure/  Triển khai cụ thể: repository in-memory, PBKDF2, refresh token, JWT
+  api/             Controller, DTO request, guard xác thực/phân quyền, bộ lọc lỗi ProblemDetails
+  config/          Đọc cấu hình từ biến môi trường
+  data/seed/       Dữ liệu tin tuyển dụng mẫu (jobs.json)
+test/              E2E test (supertest)
 ```
 
-## Compile and run the project
+Chiều phụ thuộc: `api → application → domain`, `infrastructure → application → domain`.
+`domain` không import gì từ các lớp khác.
+
+## Chạy
+
+Yêu cầu Node.js 20.12+ (dùng `process.loadEnvFile`) và npm.
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
+cp .env.example .env     # tùy chọn; có giá trị mặc định cho môi trường dev
+npm run start:dev        # http://localhost:5000/api
 ```
 
-## Run tests
+Kiểm tra:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm run build
+npm test                 # unit test
+npm run test:e2e         # e2e test toàn bộ luồng API
+npm run lint
 ```
 
-## Deployment
+## Cấu hình
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Đọc từ biến môi trường (hoặc file `.env`), xem [.env.example](.env.example).
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+| Biến | Mặc định (dev) | Ghi chú |
+| --- | --- | --- |
+| `PORT` | `5000` | Frontend mặc định gọi `http://localhost:5000/api` |
+| `JWT_SIGNING_KEY` | khóa dev | Tối thiểu 32 byte; **bắt buộc** khi `NODE_ENV=production`, thiếu thì app không khởi động |
+| `JWT_ISSUER` / `JWT_AUDIENCE` | `JobBoard.Api` / `JobBoard.Web` | |
+| `JWT_ACCESS_TOKEN_MINUTES` | `15` | |
+| `JWT_REFRESH_TOKEN_DAYS` | `7` | |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Danh sách origin, ngăn cách bằng dấu phẩy |
+| `PERSISTENCE_PROVIDER` | `InMemory` | Hiện chỉ hỗ trợ `InMemory` |
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+## Tài khoản demo
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Seed khi khởi động (mật khẩu `JobBoard@123`):
 
-## Resources
+| Vai trò | Email |
+| --- | --- |
+| Candidate | `candidate@jobboard.vn` |
+| Employer (công ty 1) | `employer@jobboard.vn` |
+| Admin | `admin@jobboard.vn` |
 
-Check out a few resources that may come in handy when working with NestJS:
+Mật khẩu lưu dạng PBKDF2-SHA256 (210.000 vòng, định dạng `v1.<vòng>.<salt>.<hash>`,
+cùng định dạng với backend C#). Đăng nhập trả access token JWT 15 phút và refresh token
+xoay vòng 7 ngày; chỉ hash SHA-256 của refresh token được lưu, và việc dùng lại token cũ
+sẽ thu hồi toàn bộ phiên cùng họ token.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## API
 
-## Support
+Tất cả route nằm dưới tiền tố `/api`.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+- `GET /health`
+- `GET /jobs` (lọc `keyword`, `location`, `category`, `level`, `minimumSalary`, `skills` lặp lại, `page`, `pageSize`, `sort`), `GET /jobs/:id`
+- `POST /auth/login`, `POST /auth/register/candidate`, `POST /auth/refresh`, `POST /auth/logout`, `PUT /auth/password`, `GET /auth/me`
+- `POST /applications` (Candidate), `PATCH /applications/:id/status` (Employer)
+- `GET|PUT /candidates/:id/profile`, `GET /candidates/:id/applications` (Candidate, chỉ của chính mình)
+- `GET|POST /employers/:companyId/jobs`, `POST /employers/:companyId/jobs/:jobId/publish|close`, `GET /employers/:companyId/applications` (Employer, đúng công ty trong token)
 
-## Stay in touch
+Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`, `instance`).
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Khác biệt so với backend C#
 
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- Chưa có chế độ PostgreSQL/EF Core: dữ liệu chỉ nằm trong bộ nhớ (mất khi khởi động lại).
+  Các repository là abstract class nên có thể thêm bản PostgreSQL mà không đổi use case.
+- Chưa có endpoint OpenAPI (`/openapi/v1.json`).
+- Tên ứng viên trong danh sách đơn ứng tuyển lấy từ repository ứng viên thay vì bảng tên cố định.
+- Vượt giới hạn số kỹ năng trả HTTP 400 (bản C# trả 500 do ném `InvalidOperationException`).
