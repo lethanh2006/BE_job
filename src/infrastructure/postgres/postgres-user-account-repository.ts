@@ -95,6 +95,14 @@ export class PostgresUserAccountRepository
     }
   }
 
+  async setDisabled(userId: number, disabled: boolean): Promise<boolean> {
+    const { rowCount } = await this.db.query(
+      'UPDATE user_accounts SET disabled_at = CASE WHEN $2::boolean THEN now() ELSE NULL END WHERE id = $1',
+      [userId, disabled],
+    );
+    return rowCount === 1;
+  }
+
   async tryUpdatePasswordHash(
     userId: number,
     expectedPasswordHash: string,
@@ -110,7 +118,8 @@ export class PostgresUserAccountRepository
 
 /** Tên công ty đọc qua JOIN: chỉ có một nguồn là bảng companies. */
 const SELECT_ACCOUNT = `
-  SELECT a.id, a.name, a.email, a.password_hash, a.role, a.company_id, c.name AS company_name
+  SELECT a.id, a.name, a.email, a.password_hash, a.role, a.company_id, a.disabled_at,
+         c.name AS company_name
     FROM user_accounts a LEFT JOIN companies c ON c.id = a.company_id`;
 
 export async function insertAccount(

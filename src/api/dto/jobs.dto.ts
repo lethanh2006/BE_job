@@ -133,6 +133,8 @@ export class EmployerJobResponseDto {
   id!: number;
   title!: string;
   status!: JobStatus;
+  /** Lý do quản trị viên gỡ tin; chỉ có khi status là Removed. */
+  removalReason!: string | null;
   /** Số đơn ứng tuyển đã nhận. */
   applications!: number;
   deadline!: Date;

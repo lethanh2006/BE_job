@@ -25,7 +25,7 @@ export class InMemoryJobSearchReader extends JobSearchReader {
 
   async search(criteria: JobSearchCriteria): Promise<JobSearchPage> {
     const filtered = (await this.jobs.getAll())
-      .filter((job) => job.status === JobStatus.Published && !job.isExpired)
+      .filter((job) => isOpen(job))
       .filter((job) => matches(job, criteria));
 
     filtered.sort(
@@ -59,6 +59,12 @@ export class InMemoryJobSearchReader extends JobSearchReader {
     );
   }
 }
+
+/** Tin đang mở công khai: đã đăng, còn hạn và công ty đang hoạt động. */
+const isOpen = (job: Job) =>
+  job.status === JobStatus.Published &&
+  !job.isExpired &&
+  (job.company?.isActive ?? true);
 
 function matches(job: Job, c: JobSearchCriteria): boolean {
   return (

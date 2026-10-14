@@ -44,7 +44,9 @@ export class SessionService {
     }
 
     const account = await this.accounts.findById(current.userId);
-    if (!account) throw new InvalidRefreshTokenException(INVALID_TOKEN_MESSAGE);
+    if (!account || account.disabled) {
+      throw new InvalidRefreshTokenException(INVALID_TOKEN_MESSAGE);
+    }
 
     const replacement = this.refreshTokenGenerator.generate(
       account.id,

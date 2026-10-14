@@ -1,5 +1,9 @@
 import { Provider } from '@nestjs/common';
 import {
+  AdminReader,
+  AuditLogRepository,
+} from '../../application/abstractions/admin';
+import {
   AccountRegistrationRepository,
   AccountSecurityRepository,
   EmployerRegistrationRepository,
@@ -18,6 +22,8 @@ import { AppConfig } from '../../config/app-config';
 import { Clock } from '../../domain';
 import { Database } from '../postgres/database';
 import { DatabaseInitializer } from '../postgres/database-initializer';
+import { PostgresAdminReader } from '../postgres/postgres-admin-reader';
+import { PostgresAuditLogRepository } from '../postgres/postgres-audit-log-repository';
 import { PostgresCandidateRepository } from '../postgres/postgres-candidate-repository';
 import { PostgresCompanyRepository } from '../postgres/postgres-company-repository';
 import { PostgresJobApplicationRepository } from '../postgres/postgres-job-application-repository';
@@ -26,6 +32,8 @@ import { PostgresJobSearchReader } from '../postgres/postgres-job-search-reader'
 import { PostgresRefreshTokenRepository } from '../postgres/postgres-refresh-token-repository';
 import { PostgresUserAccountRepository } from '../postgres/postgres-user-account-repository';
 import { JOB_SEED_FILE } from '../seed/paths';
+import { InMemoryAdminReader } from './in-memory-admin-reader';
+import { InMemoryAuditLogRepository } from './in-memory-audit-log-repository';
 import { InMemoryCandidateRepository } from './in-memory-candidate-repository';
 import { InMemoryCompanyRepository } from './in-memory-company-repository';
 import { InMemoryJobApplicationRepository } from './in-memory-job-application-repository';
@@ -88,6 +96,22 @@ function inMemoryProviders(): Provider[] {
         ),
     },
     ...accountAliases,
+    { provide: AuditLogRepository, useClass: InMemoryAuditLogRepository },
+    {
+      provide: AdminReader,
+      inject: [
+        JobRepository,
+        JobApplicationRepository,
+        CompanyRepository,
+        USER_ACCOUNTS,
+      ],
+      useFactory: (
+        jobs: JobRepository,
+        applications: JobApplicationRepository,
+        companies: InMemoryCompanyRepository,
+        accounts: InMemoryUserAccountRepository,
+      ) => new InMemoryAdminReader(jobs, applications, companies, accounts),
+    },
   ];
 }
 
@@ -135,6 +159,16 @@ function postgresProviders(config: AppConfig): Provider[] {
       useFactory: (db: Database) => new PostgresUserAccountRepository(db),
     },
     ...accountAliases,
+    {
+      provide: AuditLogRepository,
+      inject: [Database],
+      useFactory: (db: Database) => new PostgresAuditLogRepository(db),
+    },
+    {
+      provide: AdminReader,
+      inject: [Database],
+      useFactory: (db: Database) => new PostgresAdminReader(db),
+    },
   ];
 
   if (config.persistence.applyMigrations) {

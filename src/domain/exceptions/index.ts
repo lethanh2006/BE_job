@@ -15,5 +15,6 @@ export abstract class DomainException extends Error {
 
 export class AlreadyAppliedException extends DomainException {}
 export class InvalidJobStateException extends DomainException {}
+export class InvalidCompanyStateException extends DomainException {}
 export class JobClosedException extends DomainException {}
 export class JobManagementForbiddenException extends DomainException {}

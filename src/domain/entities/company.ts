@@ -1,4 +1,4 @@
-import { ArgumentError } from '../exceptions';
+import { ArgumentError, InvalidCompanyStateException } from '../exceptions';
 
 export enum CompanyStatus {
   Active = 'Active',
@@ -10,6 +10,7 @@ export const COMPANY_NAME_MAX = 200;
 export const COMPANY_LOCATION_MAX = 200;
 export const COMPANY_WEBSITE_MAX = 300;
 export const COMPANY_DESCRIPTION_MAX = 4000;
+export const MODERATION_REASON_MAX = 500;
 
 export interface CompanyProfile {
   name: string;
@@ -76,9 +77,23 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+/** Lý do kiểm duyệt (gỡ tin, khóa công ty): bắt buộc, được cắt khoảng trắng. */
+export function normalizeReason(reason: string | null | undefined): string {
+  const text = reason?.trim() ?? '';
+  if (!text) throw new ArgumentError('Vui lòng nhập lý do.');
+  if (text.length > MODERATION_REASON_MAX) {
+    throw new ArgumentError(
+      `Lý do không được dài quá ${MODERATION_REASON_MAX} ký tự.`,
+    );
+  }
+
+  return text;
+}
+
 export class Company {
   private profile: NormalizedProfile;
   private currentStatus: CompanyStatus;
+  private currentSuspensionReason?: string;
 
   constructor(
     readonly id: number,
@@ -88,10 +103,15 @@ export class Company {
       website?: string | null;
       description?: string | null;
       status?: CompanyStatus;
+      suspensionReason?: string | null;
     } = {},
   ) {
     this.profile = normalize({ name, location, ...extra });
     this.currentStatus = extra.status ?? CompanyStatus.Active;
+    this.currentSuspensionReason =
+      this.currentStatus === CompanyStatus.Suspended
+        ? extra.suspensionReason?.trim() || undefined
+        : undefined;
   }
 
   get name(): string {
@@ -112,6 +132,31 @@ export class Company {
 
   get status(): CompanyStatus {
     return this.currentStatus;
+  }
+
+  get suspensionReason(): string | undefined {
+    return this.currentSuspensionReason;
+  }
+
+  get isActive(): boolean {
+    return this.currentStatus === CompanyStatus.Active;
+  }
+
+  /** Khóa công ty: tin của công ty bị ẩn và không đăng được tin mới. */
+  suspend(reason: string): void {
+    if (this.currentStatus === CompanyStatus.Suspended) {
+      throw new InvalidCompanyStateException('Công ty đã bị khóa.');
+    }
+    this.currentSuspensionReason = normalizeReason(reason);
+    this.currentStatus = CompanyStatus.Suspended;
+  }
+
+  reactivate(): void {
+    if (this.currentStatus === CompanyStatus.Active) {
+      throw new InvalidCompanyStateException('Công ty đang hoạt động.');
+    }
+    this.currentSuspensionReason = undefined;
+    this.currentStatus = CompanyStatus.Active;
   }
 
   /** Thay toàn bộ hồ sơ công ty (tên, địa điểm, website, giới thiệu). */

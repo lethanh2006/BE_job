@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { JobStatus } from '../../domain';
 import {
   CandidateRepository,
   JobApplicationRepository,
@@ -37,7 +36,7 @@ export class CandidateMatchService {
     const jobs = await this.jobs.getByIds([...new Set(jobIds)]);
 
     return jobs
-      .filter((job) => job.status !== JobStatus.Draft)
+      .filter((job) => job.isPubliclyVisible)
       .map((job) => ({
         jobId: job.id,
         ...this.matching.breakdown(job, candidate),

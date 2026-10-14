@@ -12,6 +12,8 @@ export interface UserAccount {
   readonly role: AccountRole;
   readonly companyId?: number | null;
   readonly companyName?: string | null;
+  /** Bị quản trị viên khóa: không đăng nhập hay làm mới phiên được. */
+  readonly disabled?: boolean;
 }
 
 export interface AccessToken {

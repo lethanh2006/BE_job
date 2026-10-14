@@ -758,7 +758,9 @@ describeWithPostgres('Migration 0003 trên dữ liệu có sẵn', () => {
 
       const applied = await runMigrations(db);
 
-      expect(applied).toEqual(['0003_companies']);
+      // Mọi migration sau 0002 (gồm cả các migration thêm về sau) đều chạy được trên dữ liệu cũ.
+      expect(applied).toEqual(allMigrations.slice(2).map((m) => m.id));
+      expect(applied[0]).toBe('0003_companies');
       const { rows } = await db.query<{
         id: number;
         name: string;

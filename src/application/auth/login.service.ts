@@ -6,7 +6,10 @@ import {
   RefreshTokenRepository,
   UserAccountRepository,
 } from '../abstractions/authentication';
-import { InvalidCredentialsException } from '../exceptions';
+import {
+  AccountDisabledException,
+  InvalidCredentialsException,
+} from '../exceptions';
 import { LoginResult, toAuthenticatedUser } from './models';
 
 const INVALID_MESSAGE = 'Email hoặc mật khẩu không chính xác.';
@@ -32,6 +35,13 @@ export class LoginService {
       !(await this.passwordHasher.verify(password, account.passwordHash))
     ) {
       throw new InvalidCredentialsException(INVALID_MESSAGE);
+    }
+
+    // Chỉ báo "bị khóa" sau khi mật khẩu đúng để không lộ tài khoản nào tồn tại.
+    if (account.disabled) {
+      throw new AccountDisabledException(
+        'Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.',
+      );
     }
 
     const accessToken = await this.accessTokens.generate(account);

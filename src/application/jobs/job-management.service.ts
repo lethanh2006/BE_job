@@ -164,6 +164,7 @@ const toEmployerJob = (job: Job, applications: number): EmployerJobDto => ({
   id: job.id,
   title: job.title,
   status: job.status,
+  removalReason: job.removalReason ?? null,
   applications,
   deadline: job.deadline,
   postedAt: job.postedAt,

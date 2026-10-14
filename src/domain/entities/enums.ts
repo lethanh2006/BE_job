@@ -17,6 +17,8 @@ export enum JobStatus {
   Draft = 'Draft',
   Published = 'Published',
   Closed = 'Closed',
+  /** Bị quản trị viên gỡ vì vi phạm; ẩn khỏi công khai cho tới khi được khôi phục. */
+  Removed = 'Removed',
 }
 
 export enum WorkMode {

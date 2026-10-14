@@ -11,7 +11,11 @@ import {
 } from '../../application/jobs/job-mapping';
 import { Clock, JobLevel, JobStatus, WorkMode } from '../../domain';
 import { Database } from './database';
-import { buildJobCountQuery, buildJobSearchQuery } from './job-search-query';
+import {
+  buildJobCountQuery,
+  buildJobSearchQuery,
+  OPEN_JOB_CONDITIONS,
+} from './job-search-query';
 
 interface SummaryRow {
   id: number;
@@ -61,7 +65,7 @@ export class PostgresJobSearchReader extends JobSearchReader {
   async categories(): Promise<JobCategoryCount[]> {
     const { rows } = await this.db.query<{ category: string; total: string }>(
       `SELECT category, count(*) AS total FROM jobs
-        WHERE status = $1 AND deadline > $2 AND category <> ''
+        WHERE ${OPEN_JOB_CONDITIONS.join(' AND ')} AND category <> ''
         GROUP BY category`,
       [JobStatus.Published, this.clock.utcNow],
     );

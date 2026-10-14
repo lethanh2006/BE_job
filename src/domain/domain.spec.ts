@@ -6,6 +6,7 @@ import {
   Company,
   CompanyStatus,
   Employer,
+  InvalidCompanyStateException,
   InvalidJobStateException,
   Job,
   JobApplication,
@@ -235,6 +236,120 @@ describe('Job.refreshCompany', () => {
     expect(job.company?.name).toBe('Tên mới');
     expect(() => job.refreshCompany(new Company(2, 'Khác'))).toThrow(
       ArgumentError,
+    );
+  });
+});
+
+describe('Kiểm duyệt tin', () => {
+  it('gỡ tin từ mọi trạng thái kèm lý do, ẩn khỏi công khai', () => {
+    const draft = makeJob();
+    const published = makeJob();
+    published.publish();
+
+    draft.takeDown('  Nội dung sai sự thật  ');
+    published.takeDown('Vi phạm');
+
+    expect(draft.status).toBe(JobStatus.Removed);
+    expect(draft.removalReason).toBe('Nội dung sai sự thật');
+    expect(published.isPubliclyVisible).toBe(false);
+  });
+
+  it('bắt buộc có lý do hợp lệ và không gỡ hai lần', () => {
+    const job = makeJob();
+
+    expect(() => job.takeDown('  ')).toThrow(ArgumentError);
+    expect(() => job.takeDown('x'.repeat(501))).toThrow(ArgumentError);
+    expect(job.status).toBe(JobStatus.Draft);
+    job.takeDown('Vi phạm');
+    expect(() => job.takeDown('Lần nữa')).toThrow(InvalidJobStateException);
+  });
+
+  it('khôi phục tin bị gỡ về bản nháp và xóa lý do; tin chưa bị gỡ thì không khôi phục được', () => {
+    const job = makeJob();
+    expect(() => job.reinstate()).toThrow(InvalidJobStateException);
+
+    job.takeDown('Vi phạm');
+    job.reinstate();
+
+    expect(job.status).toBe(JobStatus.Draft);
+    expect(job.removalReason).toBeUndefined();
+  });
+
+  it('tin bị gỡ không sửa, không đăng, không đóng được', () => {
+    const job = makeJob();
+    job.takeDown('Vi phạm');
+
+    expect(() => job.publish()).toThrow(InvalidJobStateException);
+    expect(() => job.close()).toThrow(InvalidJobStateException);
+    expect(() =>
+      job.update(
+        {
+          title: 'X',
+          salary: new SalaryRange(1, 2),
+          deadline: job.deadline,
+          location: '',
+          level: JobLevel.Middle,
+          workMode: WorkMode.Onsite,
+          category: '',
+          summary: '',
+        },
+        [],
+      ),
+    ).toThrow(InvalidJobStateException);
+  });
+
+  it('công khai: đang đăng hoặc đã đóng của công ty đang hoạt động', () => {
+    const company = new Company(1, 'Nova');
+    const clock = new FixedClock(new Date('2026-10-01T00:00:00Z'));
+    const make = () =>
+      Job.create({
+        id: 1,
+        title: 'Dev',
+        companyId: 1,
+        company,
+        salary: new SalaryRange(1, 2),
+        deadline: new Date('2026-12-01T00:00:00Z'),
+        clock,
+      });
+    const job = make();
+    expect(job.isPubliclyVisible).toBe(false); // bản nháp
+    job.publish();
+    expect(job.isPubliclyVisible).toBe(true);
+    company.suspend('Vi phạm');
+    expect(job.isPubliclyVisible).toBe(false);
+    company.reactivate();
+    job.close();
+    expect(job.isPubliclyVisible).toBe(true);
+  });
+});
+
+describe('Company - khóa/mở khóa', () => {
+  it('khóa kèm lý do, mở khóa xóa lý do', () => {
+    const company = new Company(1, 'Nova');
+
+    company.suspend(' Vi phạm điều khoản ');
+    expect(company).toMatchObject({
+      status: CompanyStatus.Suspended,
+      suspensionReason: 'Vi phạm điều khoản',
+      isActive: false,
+    });
+
+    company.reactivate();
+    expect(company).toMatchObject({
+      status: CompanyStatus.Active,
+      isActive: true,
+    });
+    expect(company.suspensionReason).toBeUndefined();
+  });
+
+  it('từ chối lý do rỗng và chuyển trạng thái sai', () => {
+    const company = new Company(1, 'Nova');
+
+    expect(() => company.suspend('')).toThrow(ArgumentError);
+    expect(() => company.reactivate()).toThrow(InvalidCompanyStateException);
+    company.suspend('Vi phạm');
+    expect(() => company.suspend('Lần nữa')).toThrow(
+      InvalidCompanyStateException,
     );
   });
 });

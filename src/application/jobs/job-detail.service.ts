@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { JobStatus } from '../../domain';
 import { JobRepository } from '../abstractions/persistence';
 import { ResourceNotFoundException } from '../exceptions';
 import { JobDetailDto } from './dto';
@@ -11,8 +10,8 @@ export class JobDetailService {
 
   async getById(id: number): Promise<JobDetailDto> {
     const job = await this.jobs.getById(id);
-    // Bản nháp chưa công khai: coi như không tồn tại để không lộ nội dung chưa đăng.
-    if (!job || job.status === JobStatus.Draft) {
+    // Bản nháp, tin bị gỡ và tin của công ty bị khóa không công khai: coi như không tồn tại.
+    if (!job || !job.isPubliclyVisible) {
       throw new ResourceNotFoundException(
         `Không tìm thấy tin tuyển dụng có mã ${id}.`,
       );

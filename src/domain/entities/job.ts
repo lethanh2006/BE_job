@@ -1,6 +1,6 @@
 import { Clock } from '../clock';
 import { ArgumentError, InvalidJobStateException } from '../exceptions';
-import { Company } from './company';
+import { Company, normalizeReason } from './company';
 import { JobLevel, JobStatus, WorkMode } from './enums';
 import { SalaryRange } from './salary-range';
 import { Skill, SkillSet } from './skill';
@@ -25,6 +25,8 @@ export interface JobProps {
   benefits?: Iterable<string> | null;
   postedAt?: Date | null;
   featured?: boolean;
+  /** Chỉ có ý nghĩa khi tin ở trạng thái Removed. */
+  removalReason?: string | null;
 }
 
 function normalizeItems(items?: Iterable<string> | null): string[] {
@@ -82,6 +84,7 @@ export class Job {
   readonly featured: boolean;
   private content: JobContent;
   private currentStatus: JobStatus;
+  private currentRemovalReason?: string;
   private readonly skillSet = new SkillSet();
   private readonly clock: Clock;
   private readonly publishedListeners: ((job: Job) => void)[] = [];
@@ -120,6 +123,10 @@ export class Job {
     this.postedAt = props.postedAt ?? props.clock.utcNow;
     this.featured = props.featured ?? false;
     this.currentStatus = status;
+    this.currentRemovalReason =
+      status === JobStatus.Removed
+        ? props.removalReason?.trim() || undefined
+        : undefined;
     this.clock = props.clock;
   }
 
@@ -196,6 +203,22 @@ export class Job {
     return this.currentStatus;
   }
 
+  get removalReason(): string | undefined {
+    return this.currentRemovalReason;
+  }
+
+  /**
+   * Người dùng thường xem được chi tiết: tin đang đăng hoặc đã đóng của công ty đang hoạt động.
+   * Bản nháp, tin bị gỡ và tin của công ty bị khóa là không công khai.
+   */
+  get isPubliclyVisible(): boolean {
+    return (
+      (this.currentStatus === JobStatus.Published ||
+        this.currentStatus === JobStatus.Closed) &&
+      (this.currentCompany?.isActive ?? true)
+    );
+  }
+
   get skills(): readonly Skill[] {
     return this.skillSet.values();
   }
@@ -219,6 +242,11 @@ export class Job {
     if (this.currentStatus === JobStatus.Closed) {
       throw new InvalidJobStateException(
         'Tin tuyển dụng đã đóng không thể chỉnh sửa.',
+      );
+    }
+    if (this.currentStatus === JobStatus.Removed) {
+      throw new InvalidJobStateException(
+        'Tin tuyển dụng đang bị gỡ, chưa thể chỉnh sửa.',
       );
     }
 
@@ -266,6 +294,26 @@ export class Job {
       );
     }
     this.currentStatus = JobStatus.Closed;
+  }
+
+  /** Quản trị viên gỡ tin vi phạm (từ mọi trạng thái trừ khi đã bị gỡ). */
+  takeDown(reason: string): void {
+    if (this.currentStatus === JobStatus.Removed) {
+      throw new InvalidJobStateException('Tin tuyển dụng đã bị gỡ.');
+    }
+    this.currentRemovalReason = normalizeReason(reason);
+    this.currentStatus = JobStatus.Removed;
+  }
+
+  /** Khôi phục tin bị gỡ về bản nháp để nhà tuyển dụng xem lại rồi đăng lại. */
+  reinstate(): void {
+    if (this.currentStatus !== JobStatus.Removed) {
+      throw new InvalidJobStateException(
+        'Tin tuyển dụng không ở trạng thái bị gỡ.',
+      );
+    }
+    this.currentRemovalReason = undefined;
+    this.currentStatus = JobStatus.Draft;
   }
 
   addSkill(skill: Skill): boolean {

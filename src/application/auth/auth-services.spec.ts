@@ -9,6 +9,7 @@ import { InMemoryUserAccountRepository } from '../../infrastructure/persistence/
 import { MutableClock } from '../../testing/test-helpers';
 import { AccessTokenGenerator } from '../abstractions/authentication';
 import {
+  AccountDisabledException,
   CurrentPasswordIncorrectException,
   CompanyNameAlreadyExistsException,
   EmailAlreadyExistsException,
@@ -352,6 +353,36 @@ describe('RegistrationService - nhà tuyển dụng', () => {
       companyId: 1,
       companyName: 'Nova Group',
     });
+  });
+});
+
+describe('Tài khoản bị khóa', () => {
+  it('đăng nhập báo bị khóa (chỉ khi đúng mật khẩu) và refresh token không còn dùng được', async () => {
+    const s = await createSystem();
+    const session = await s.login.login('candidate@jobboard.vn', PASSWORD);
+
+    await s.accounts.setDisabled(20, true);
+
+    await expect(
+      s.login.login('candidate@jobboard.vn', PASSWORD),
+    ).rejects.toBeInstanceOf(AccountDisabledException);
+    // Sai mật khẩu vẫn trả lỗi chung để không lộ trạng thái tài khoản.
+    await expect(
+      s.login.login('candidate@jobboard.vn', 'sai'),
+    ).rejects.toBeInstanceOf(InvalidCredentialsException);
+    await expect(
+      s.session.refresh(session.refreshToken),
+    ).rejects.toBeInstanceOf(InvalidRefreshTokenException);
+
+    await s.accounts.setDisabled(20, false);
+    await expect(
+      s.login.login('candidate@jobboard.vn', PASSWORD),
+    ).resolves.toBeDefined();
+  });
+
+  it('setDisabled trả false với tài khoản không tồn tại', async () => {
+    const s = await createSystem();
+    expect(await s.accounts.setDisabled(9999, true)).toBe(false);
   });
 });
 

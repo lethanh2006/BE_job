@@ -39,7 +39,10 @@ export interface JobRow {
   posted_at: Date;
   featured: boolean;
   status: JobStatus;
+  removal_reason: string | null;
   skills: string[];
+  /** Trạng thái công ty (JOIN), để biết tin có đang bị ẩn vì công ty bị khóa. */
+  company_status: CompanyStatus | null;
 }
 
 export interface CandidateRow {
@@ -68,6 +71,7 @@ export interface UserAccountRow {
   role: AccountRole;
   company_id: number | null;
   company_name: string | null;
+  disabled_at: Date | null;
 }
 
 export interface CompanyRow {
@@ -77,6 +81,7 @@ export interface CompanyRow {
   website: string | null;
   description: string | null;
   status: CompanyStatus;
+  suspension_reason: string | null;
 }
 
 export interface RefreshTokenRow {
@@ -95,6 +100,7 @@ export function toCompany(row: CompanyRow): Company {
     website: row.website,
     description: row.description,
     status: row.status,
+    suspensionReason: row.suspension_reason,
   });
 }
 
@@ -110,6 +116,7 @@ export function toJob(row: JobRow, clock: Clock): Job {
       row.company_id,
       row.company_name,
       row.company_location,
+      { status: row.company_status ?? CompanyStatus.Active },
     ),
     location: row.location,
     level: row.level,
@@ -122,6 +129,7 @@ export function toJob(row: JobRow, clock: Clock): Job {
     postedAt: row.posted_at,
     featured: row.featured,
     status: row.status,
+    removalReason: row.removal_reason,
   });
   row.skills.forEach((skill) => job.addSkill(new Skill(skill)));
 
@@ -149,6 +157,7 @@ export function jobColumns(job: Job): unknown[] {
     job.postedAt,
     job.featured,
     job.status,
+    job.removalReason ?? null,
     job.skills.map((skill) => skill.name),
   ];
 }
@@ -192,6 +201,7 @@ export function toUserAccount(row: UserAccountRow): UserAccount {
     role: row.role,
     companyId: row.company_id,
     companyName: row.company_name,
+    disabled: row.disabled_at !== null,
   };
 }
 

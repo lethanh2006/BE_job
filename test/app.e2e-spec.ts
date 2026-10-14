@@ -728,4 +728,355 @@ describe.each(backends)('JobBoard API (e2e) — $name', (backend) => {
         .expect(400);
     });
   });
+
+  describe('quản trị viên kiểm duyệt', () => {
+    const unique = `${Date.now()}`.slice(-9);
+    let adminToken: string;
+
+    beforeAll(async () => {
+      adminToken = (await login('admin@jobboard.vn')).body.accessToken;
+    });
+
+    const registerEmployer = async (suffix: string) => {
+      const res = await http()
+        .post('/api/auth/register/employer')
+        .send({
+          name: 'Chủ',
+          email: `kd.${suffix}.${unique}@example.com`,
+          password: 'Mat-khau-1234',
+          companyName: `Công ty kiểm duyệt ${suffix} ${unique}`,
+        })
+        .expect(201);
+      return {
+        token: res.body.accessToken as string,
+        companyId: res.body.user.companyId as number,
+        email: `kd.${suffix}.${unique}@example.com`,
+      };
+    };
+
+    const publishJob = async (
+      employer: { token: string; companyId: number },
+      title: string,
+    ) => {
+      const created = await http()
+        .post(`/api/employers/${employer.companyId}/jobs`)
+        .set(bearer(employer.token))
+        .send({
+          title,
+          location: 'HN',
+          salaryMin: 100,
+          salaryMax: 200,
+          deadline: '2099-01-01T00:00:00Z',
+          level: 'Junior',
+          workMode: 'Remote',
+          category: 'Kinh doanh',
+          summary: 's',
+          skills: [],
+        })
+        .expect(201);
+      await http()
+        .post(
+          `/api/employers/${employer.companyId}/jobs/${created.body.id}/publish`,
+        )
+        .set(bearer(employer.token))
+        .expect(200);
+      return created.body.id as number;
+    };
+
+    it('chỉ quản trị viên được truy cập', async () => {
+      const candidate = (await login('candidate@jobboard.vn')).body.accessToken;
+      const employer = (await login('employer@jobboard.vn')).body.accessToken;
+
+      await http().get('/api/admin/stats').expect(401);
+      await http().get('/api/admin/stats').set(bearer(candidate)).expect(403);
+      await http().get('/api/admin/users').set(bearer(employer)).expect(403);
+      await http()
+        .post('/api/admin/jobs/1/takedown')
+        .set(bearer(employer))
+        .send({ reason: 'x' })
+        .expect(403);
+    });
+
+    it('thống kê và danh sách có lọc, phân trang', async () => {
+      const stats = await http()
+        .get('/api/admin/stats')
+        .set(bearer(adminToken))
+        .expect(200);
+      expect(stats.body.users.admins).toBeGreaterThanOrEqual(1);
+      expect(stats.body.jobs.published).toBeGreaterThan(0);
+
+      const jobs = await http()
+        .get('/api/admin/jobs?status=Published&pageSize=2')
+        .set(bearer(adminToken))
+        .expect(200);
+      expect(jobs.body.items.length).toBeLessThanOrEqual(2);
+      expect(
+        jobs.body.items.every(
+          (job: { status: string }) => job.status === 'Published',
+        ),
+      ).toBe(true);
+      expect(jobs.body.totalItems).toBeGreaterThanOrEqual(
+        jobs.body.items.length,
+      );
+
+      const users = await http()
+        .get('/api/admin/users?role=Admin&keyword=quan%20tri')
+        .set(bearer(adminToken))
+        .expect(200);
+      expect(users.body.items.map((u: { email: string }) => u.email)).toEqual([
+        'admin@jobboard.vn',
+      ]);
+
+      await http()
+        .get('/api/admin/companies?keyword=nova')
+        .set(bearer(adminToken))
+        .expect(200);
+      await http()
+        .get('/api/admin/jobs?status=Boss')
+        .set(bearer(adminToken))
+        .expect(400);
+      await http()
+        .get('/api/admin/users?pageSize=1000')
+        .set(bearer(adminToken))
+        .expect(400);
+    });
+
+    it('gỡ tin: ẩn khỏi công khai, nhà tuyển dụng thấy lý do, khôi phục về bản nháp', async () => {
+      const employer = await registerEmployer('gotin');
+      const jobId = await publishJob(employer, 'Tin sẽ bị gỡ');
+      const candidate = (await login('candidate@jobboard.vn')).body.accessToken;
+      await http()
+        .get(`/api/jobs?companyId=${employer.companyId}`)
+        .then((r) => expect(r.body.totalItems).toBe(1));
+
+      await http()
+        .post(`/api/admin/jobs/${jobId}/takedown`)
+        .set(bearer(adminToken))
+        .send({ reason: '   ' })
+        .expect(400);
+      const removed = await http()
+        .post(`/api/admin/jobs/${jobId}/takedown`)
+        .set(bearer(adminToken))
+        .send({ reason: 'Quảng cáo lừa đảo' })
+        .expect(200);
+      expect(removed.body).toEqual({
+        id: jobId,
+        status: 'Removed',
+        removalReason: 'Quảng cáo lừa đảo',
+      });
+      await http()
+        .post(`/api/admin/jobs/${jobId}/takedown`)
+        .set(bearer(adminToken))
+        .send({ reason: 'Lần nữa' })
+        .expect(400);
+
+      await http()
+        .get(`/api/jobs?companyId=${employer.companyId}`)
+        .then((r) => expect(r.body.totalItems).toBe(0));
+      await http().get(`/api/jobs/${jobId}`).expect(404);
+      await http()
+        .post('/api/applications')
+        .set(bearer(candidate))
+        .send({ jobId })
+        .expect(400);
+
+      const own = await http()
+        .get(`/api/employers/${employer.companyId}/jobs`)
+        .set(bearer(employer.token))
+        .expect(200);
+      expect(own.body[0]).toMatchObject({
+        status: 'Removed',
+        removalReason: 'Quảng cáo lừa đảo',
+      });
+      await http()
+        .post(`/api/employers/${employer.companyId}/jobs/${jobId}/publish`)
+        .set(bearer(employer.token))
+        .expect(400);
+
+      const adminView = await http()
+        .get(`/api/admin/jobs?status=Removed&companyId=${employer.companyId}`)
+        .set(bearer(adminToken))
+        .expect(200);
+      expect(adminView.body.items).toEqual([
+        expect.objectContaining({
+          id: jobId,
+          removalReason: 'Quảng cáo lừa đảo',
+        }),
+      ]);
+
+      await http()
+        .post(`/api/admin/jobs/${jobId}/reinstate`)
+        .set(bearer(adminToken))
+        .expect(200)
+        .then((r) =>
+          expect(r.body).toEqual({
+            id: jobId,
+            status: 'Draft',
+            removalReason: null,
+          }),
+        );
+      await http()
+        .post(`/api/admin/jobs/${jobId}/reinstate`)
+        .set(bearer(adminToken))
+        .expect(400);
+      await http()
+        .post(`/api/employers/${employer.companyId}/jobs/${jobId}/publish`)
+        .set(bearer(employer.token))
+        .expect(200);
+      await http().get(`/api/jobs/${jobId}`).expect(200);
+      await http()
+        .post('/api/admin/jobs/999999/takedown')
+        .set(bearer(adminToken))
+        .send({ reason: 'x' })
+        .expect(404);
+    });
+
+    it('khóa công ty: tin và trang công ty bị ẩn, không đăng tin mới; mở khóa trả lại', async () => {
+      const employer = await registerEmployer('khoa');
+      const jobId = await publishJob(employer, 'Tin của công ty bị khóa');
+
+      await http()
+        .post(`/api/admin/companies/${employer.companyId}/suspend`)
+        .set(bearer(adminToken))
+        .send({ reason: 'Nghi ngờ lừa đảo' })
+        .expect(200)
+        .then((r) =>
+          expect(r.body).toEqual({
+            id: employer.companyId,
+            status: 'Suspended',
+            suspensionReason: 'Nghi ngờ lừa đảo',
+          }),
+        );
+
+      await http()
+        .get(`/api/jobs?companyId=${employer.companyId}`)
+        .then((r) => expect(r.body.totalItems).toBe(0));
+      await http().get(`/api/jobs/${jobId}`).expect(404);
+      await http().get(`/api/companies/${employer.companyId}`).expect(404);
+      const own = await http()
+        .get(`/api/employers/${employer.companyId}/company`)
+        .set(bearer(employer.token))
+        .expect(200);
+      expect(own.body.status).toBe('Suspended');
+      await http()
+        .post(`/api/employers/${employer.companyId}/jobs`)
+        .set(bearer(employer.token))
+        .send({
+          title: 'Tin mới',
+          location: 'HN',
+          salaryMin: 1,
+          salaryMax: 2,
+          deadline: '2099-01-01T00:00:00Z',
+          level: 'Junior',
+          workMode: 'Remote',
+          category: 'IT',
+          summary: 's',
+          skills: [],
+        })
+        .expect(403);
+      await http()
+        .post(`/api/admin/companies/${employer.companyId}/suspend`)
+        .set(bearer(adminToken))
+        .send({ reason: 'Lần nữa' })
+        .expect(400);
+
+      const suspended = await http()
+        .get(
+          `/api/admin/companies?status=Suspended&keyword=${employer.companyId}`,
+        )
+        .set(bearer(adminToken))
+        .expect(200);
+      expect(suspended.body.totalItems).toBeGreaterThanOrEqual(0);
+
+      await http()
+        .post(`/api/admin/companies/${employer.companyId}/reactivate`)
+        .set(bearer(adminToken))
+        .expect(200);
+      await http().get(`/api/jobs/${jobId}`).expect(200);
+      await http().get(`/api/companies/${employer.companyId}`).expect(200);
+      await http().get('/api/jobs/categories').expect(200);
+    });
+
+    it('khóa tài khoản: không đăng nhập, không làm mới phiên; mở khóa; không khóa chính mình', async () => {
+      const email = `khoa.${unique}@example.com`;
+      const registered = await http()
+        .post('/api/auth/register/candidate')
+        .send({ name: 'Bị khóa', email, password: 'Mat-khau-1234' })
+        .expect(201);
+      const userId = registered.body.user.id;
+
+      await http()
+        .post(`/api/admin/users/${userId}/disable`)
+        .set(bearer(adminToken))
+        .expect(200)
+        .then((r) => expect(r.body).toEqual({ id: userId, disabled: true }));
+
+      const blocked = await login(email, 'Mat-khau-1234');
+      expect(blocked.status).toBe(403);
+      expect(blocked.body.title).toBe('Tài khoản đã bị khóa');
+      expect((await login(email, 'sai-mat-khau')).status).toBe(401);
+      await http()
+        .post('/api/auth/refresh')
+        .send({ refreshToken: registered.body.refreshToken })
+        .expect(401);
+
+      const listed = await http()
+        .get('/api/admin/users?disabled=true')
+        .set(bearer(adminToken))
+        .expect(200);
+      expect(listed.body.items.map((u: { id: number }) => u.id)).toContain(
+        userId,
+      );
+
+      await http()
+        .post(`/api/admin/users/${userId}/enable`)
+        .set(bearer(adminToken))
+        .expect(200);
+      expect((await login(email, 'Mat-khau-1234')).status).toBe(200);
+
+      const adminId = (await http().get('/api/auth/me').set(bearer(adminToken)))
+        .body.id;
+      await http()
+        .post(`/api/admin/users/${adminId}/disable`)
+        .set(bearer(adminToken))
+        .expect(400);
+      await http()
+        .post('/api/admin/users/999999/disable')
+        .set(bearer(adminToken))
+        .expect(404);
+    });
+
+    it('nhật ký ghi lại các thao tác theo thứ tự mới nhất trước', async () => {
+      const logs = await http()
+        .get('/api/admin/audit-logs?pageSize=100')
+        .set(bearer(adminToken))
+        .expect(200);
+
+      const actions = logs.body.items.map(
+        (entry: { action: string }) => entry.action,
+      );
+      expect(actions).toEqual(
+        expect.arrayContaining([
+          'JobTakenDown',
+          'JobReinstated',
+          'CompanySuspended',
+          'CompanyReactivated',
+          'UserDisabled',
+          'UserEnabled',
+        ]),
+      );
+      expect(logs.body.items[0]).toMatchObject({
+        actorName: expect.any(String),
+        targetType: expect.any(String),
+      });
+      const times = logs.body.items.map((entry: { createdAt: string }) =>
+        Date.parse(entry.createdAt),
+      );
+      expect(times).toEqual([...times].sort((a, b) => b - a));
+      await http()
+        .get('/api/admin/audit-logs?page=0')
+        .set(bearer(adminToken))
+        .expect(400);
+    });
+  });
 });

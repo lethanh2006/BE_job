@@ -42,7 +42,8 @@ export class PostgresCompanyRepository extends CompanyRepository {
     try {
       const { rowCount } = await this.db.query(
         `UPDATE companies
-            SET name = $2, location = $3, website = $4, description = $5, status = $6
+            SET name = $2, location = $3, website = $4, description = $5, status = $6,
+                suspension_reason = $7
           WHERE id = $1`,
         [
           company.id,
@@ -51,6 +52,7 @@ export class PostgresCompanyRepository extends CompanyRepository {
           company.website ?? null,
           company.description ?? null,
           company.status,
+          company.suspensionReason ?? null,
         ],
       );
       if (rowCount === 0) {
@@ -68,8 +70,8 @@ export async function insertCompany(
   company: Company,
 ): Promise<void> {
   await db.query(
-    `INSERT INTO companies (id, name, location, website, description, status)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+    `INSERT INTO companies (id, name, location, website, description, status, suspension_reason)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [
       company.id,
       company.name,
@@ -77,6 +79,7 @@ export async function insertCompany(
       company.website ?? null,
       company.description ?? null,
       company.status,
+      company.suspensionReason ?? null,
     ],
   );
 }

@@ -22,6 +22,11 @@ export class InMemoryCompanyRepository extends CompanyRepository {
     return (await this.load()).get(id) ?? null;
   }
 
+  /** Toàn bộ công ty, phục vụ trang quản trị của provider in-memory. */
+  async listAll(): Promise<Company[]> {
+    return [...(await this.load()).values()];
+  }
+
   async getNextId(): Promise<number> {
     await this.load();
     return ++this.lastId;

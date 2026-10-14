@@ -39,6 +39,8 @@ export abstract class AccountSecurityRepository {
     expectedPasswordHash: string,
     newPasswordHash: string,
   ): Promise<boolean>;
+  /** Khóa/mở khóa tài khoản; false nếu tài khoản không tồn tại. */
+  abstract setDisabled(userId: number, disabled: boolean): Promise<boolean>;
 }
 
 export abstract class PasswordHasher {

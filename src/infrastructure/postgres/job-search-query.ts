@@ -1,7 +1,7 @@
 import { JobSearchCriteria } from '../../application/abstractions/persistence';
 import { foldText } from '../../application/common/text-folding';
 import { JobSortOrder } from '../../application/jobs/dto';
-import { JobStatus } from '../../domain';
+import { CompanyStatus, JobStatus } from '../../domain';
 
 /** Escape ký tự đặc biệt của LIKE để từ khóa của người dùng luôn được hiểu là chuỗi thường. */
 export const escapeLike = (value: string): string =>
@@ -15,10 +15,20 @@ export interface BuiltQuery {
 const SUMMARY_COLUMNS = `id, title, company_id, company_name, location, salary_min, salary_max,
   level, work_mode, category, deadline, posted_at, featured, skills`;
 
+/**
+ * Tin đang mở công khai: đã đăng, còn hạn và công ty đang hoạt động. Dùng chung cho tìm kiếm
+ * và thống kê lĩnh vực để hai nơi không lệch nhau. Tham số $1 = trạng thái, $2 = thời điểm hiện tại.
+ */
+export const OPEN_JOB_CONDITIONS = [
+  'status = $1',
+  'deadline > $2',
+  `EXISTS (SELECT 1 FROM companies c WHERE c.id = jobs.company_id AND c.status = '${CompanyStatus.Active}')`,
+];
+
 function whereClause(criteria: JobSearchCriteria, now: Date) {
   const params: unknown[] = [JobStatus.Published, now];
   const bind = (value: unknown) => `$${params.push(value)}`;
-  const conditions = ['status = $1', 'deadline > $2'];
+  const conditions = [...OPEN_JOB_CONDITIONS];
 
   // Mẫu tìm đã chuẩn hóa (không dấu, chữ thường) để khớp với cột/hàm vn_fold phía database.
   const contains = (value: string) => bind(`%${escapeLike(foldText(value))}%`);

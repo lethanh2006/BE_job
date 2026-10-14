@@ -106,6 +106,23 @@ export class InMemoryUserAccountRepository
     }
   }
 
+  setDisabled(userId: number, disabled: boolean): Promise<boolean> {
+    const current = [...this.accounts.values()].find((a) => a.id === userId);
+    if (!current) return Promise.resolve(false);
+
+    this.accounts.set(current.email.toLowerCase(), { ...current, disabled });
+    return Promise.resolve(true);
+  }
+
+  /** Toàn bộ tài khoản (kèm tên công ty), phục vụ trang quản trị của provider in-memory. */
+  async listAll(): Promise<UserAccount[]> {
+    return Promise.all(
+      [...this.accounts.values()].map(
+        async (account) => (await this.withCompanyName(account))!,
+      ),
+    );
+  }
+
   tryUpdatePasswordHash(
     userId: number,
     expectedPasswordHash: string,

@@ -91,6 +91,7 @@ Tất cả route nằm dưới tiền tố `/api`.
 - `POST /auth/login`, `POST /auth/register/candidate`, `POST /auth/register/employer` (tạo công ty + tài khoản quản lý), `POST /auth/refresh`, `POST /auth/logout`, `PUT /auth/password`, `GET /auth/me`
 - `POST /applications` (Candidate), `PATCH /applications/:id/status` (Employer)
 - `GET|PUT /candidates/:id/profile`, `GET /candidates/:id/applications`, `GET /candidates/:id/job-matches?jobIds=1,2`, `GET /candidates/:id/recommended-jobs` (Candidate, chỉ của chính mình)
+- `GET /admin/stats`, `GET /admin/jobs|companies|users|audit-logs`, `POST /admin/jobs/:id/takedown|reinstate`, `POST /admin/companies/:id/suspend|reactivate`, `POST /admin/users/:id/disable|enable` (Admin)
 - `GET|POST /employers/:companyId/jobs`, `GET|PUT /employers/:companyId/jobs/:jobId`, `POST .../jobs/:jobId/publish|close`, `GET /employers/:companyId/applications`, `GET /employers/:companyId/applications/:id`, `GET|PUT /employers/:companyId/company` (Employer, đúng công ty trong token)
 
 Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`, `instance`).
@@ -108,6 +109,20 @@ Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`,
 - **Độ phù hợp** (`JobMatchService`) = 70% độ trùng kỹ năng + 30% khoảng lương giao nhau, được ghép bằng
   `CompositeScorer` + `WeightedScorer`. Dùng cho danh sách ứng viên của nhà tuyển dụng, điểm từng tin của ứng
   viên (`job-matches`) và gợi ý việc làm (`recommended-jobs`, chọn trong 100 tin đang tuyển mới nhất).
+
+## Kiểm duyệt (quản trị viên)
+
+- **Gỡ tin** (`takedown`): tin sang trạng thái `Removed` kèm lý do, biến mất khỏi tìm kiếm và trang chi tiết công
+  khai; nhà tuyển dụng thấy lý do nhưng không sửa/đăng được. **Khôi phục** (`reinstate`) đưa tin về bản nháp để
+  nhà tuyển dụng xem lại và đăng lại. Đơn ứng tuyển cũ được giữ nguyên.
+- **Khóa công ty** (`suspend`): mọi tin của công ty bị ẩn khỏi tìm kiếm/chi tiết công khai, trang công ty trả 404 và
+  công ty không tạo/đăng tin mới được. Tìm kiếm lọc theo trạng thái công ty ngay trong SQL nên có hiệu lực tức thì.
+- **Khóa tài khoản** (`disable`): thu hồi mọi refresh token, đăng nhập trả 403 (chỉ báo "bị khóa" sau khi đúng mật
+  khẩu để không lộ tài khoản nào tồn tại). Access token đã cấp còn hiệu lực tối đa `JWT_ACCESS_TOKEN_MINUTES` phút.
+  Không khóa được chính mình hoặc quản trị viên khác.
+- Mọi thao tác ghi vào `audit_logs` (ai, làm gì, lúc nào, lý do) và đọc lại qua `GET /admin/audit-logs`.
+- Các màn hình liệt kê/thống kê đi qua `AdminReader` (phía đọc, lọc/đếm/phân trang trong SQL); có test so khớp
+  PostgreSQL với bản in-memory trên cùng một kịch bản.
 
 ## Cơ sở dữ liệu
 

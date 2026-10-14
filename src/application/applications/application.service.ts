@@ -29,7 +29,11 @@ export class ApplicationService {
         `Không tìm thấy tin tuyển dụng có mã ${jobId}.`,
       );
     }
-    if (job.status !== JobStatus.Published || job.isExpired) {
+    if (
+      job.status !== JobStatus.Published ||
+      !job.isPubliclyVisible ||
+      job.isExpired
+    ) {
       throw new JobClosedException(
         'Tin tuyển dụng đã đóng hoặc hết hạn nhận hồ sơ.',
       );

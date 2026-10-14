@@ -39,6 +39,8 @@ export interface EmployerJobDto {
   id: number;
   title: string;
   status: JobStatus;
+  /** Lý do quản trị viên gỡ tin; chỉ có khi status là Removed. */
+  removalReason: string | null;
   applications: number;
   deadline: Date;
   postedAt: Date;

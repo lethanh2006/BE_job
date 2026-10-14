@@ -14,6 +14,7 @@ import {
   JobManagementForbiddenException,
 } from '../../domain';
 import {
+  AccountDisabledException,
   CompanyNameAlreadyExistsException,
   CurrentPasswordIncorrectException,
   EmailAlreadyExistsException,
@@ -62,6 +63,9 @@ export class ProblemDetailsFilter implements ExceptionFilter {
 
     if (exception instanceof InvalidCredentialsException) {
       return make(HttpStatus.UNAUTHORIZED, 'Đăng nhập thất bại');
+    }
+    if (exception instanceof AccountDisabledException) {
+      return make(HttpStatus.FORBIDDEN, 'Tài khoản đã bị khóa');
     }
     if (exception instanceof InvalidRefreshTokenException) {
       return make(HttpStatus.UNAUTHORIZED, 'Phiên đăng nhập không hợp lệ');
