@@ -115,3 +115,45 @@ describe('AppConfig: đặt lại mật khẩu', () => {
     expect(() => AppConfig.fromEnv(env)).toThrow(expected);
   });
 });
+
+describe('AppConfig: bảo mật', () => {
+  it('bật giới hạn tần suất mặc định, trừ khi NODE_ENV=test hoặc tắt rõ ràng', () => {
+    expect(AppConfig.fromEnv({}).security.rateLimitEnabled).toBe(true);
+    expect(
+      AppConfig.fromEnv({ NODE_ENV: 'test' }).security.rateLimitEnabled,
+    ).toBe(false);
+    expect(
+      AppConfig.fromEnv({ NODE_ENV: 'test', RATE_LIMIT_ENABLED: 'true' })
+        .security.rateLimitEnabled,
+    ).toBe(true);
+    expect(
+      AppConfig.fromEnv({ RATE_LIMIT_ENABLED: 'false' }).security
+        .rateLimitEnabled,
+    ).toBe(false);
+  });
+
+  it('proxy tin cậy: dev tin loopback, production mặc định không tin ai', () => {
+    expect(AppConfig.fromEnv({}).security.trustProxy).toEqual(['loopback']);
+    expect(AppConfig.fromEnv(production).security.trustProxy).toBe(false);
+  });
+
+  it.each([
+    ['true', true],
+    ['false', false],
+    ['1', 1],
+    ['2', 2],
+    ['0', false],
+    ['loopback', ['loopback']],
+    [' 10.0.0.0/8 , loopback ,, ', ['10.0.0.0/8', 'loopback']],
+  ])('đọc TRUST_PROXY=%j', (raw, expected) => {
+    expect(AppConfig.fromEnv({ TRUST_PROXY: raw }).security.trustProxy).toEqual(
+      expected,
+    );
+  });
+
+  it('TRUST_PROXY chỉ có dấu phẩy là không hợp lệ', () => {
+    expect(() => AppConfig.fromEnv({ TRUST_PROXY: ' , ' })).toThrow(
+      'TRUST_PROXY',
+    );
+  });
+});

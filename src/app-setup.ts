@@ -3,6 +3,7 @@ import {
   ValidationError,
   ValidationPipe,
 } from '@nestjs/common';
+import type { Express } from 'express';
 import { AppConfig } from './config/app-config';
 import { ArgumentError } from './domain';
 
@@ -14,6 +15,11 @@ const flattenMessages = (errors: ValidationError[]): string[] =>
 
 /** Cấu hình dùng chung cho ứng dụng thật và test e2e: tiền tố /api, validation, CORS. */
 export function configureApp(app: INestApplication, config: AppConfig): void {
+  // Quyết định `request.ip` lấy từ socket hay từ X-Forwarded-For; giới hạn tần suất dựa vào nó.
+  (app.getHttpAdapter().getInstance() as Express).set(
+    'trust proxy',
+    config.security.trustProxy,
+  );
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({

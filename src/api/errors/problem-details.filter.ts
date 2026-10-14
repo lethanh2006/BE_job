@@ -22,12 +22,15 @@ import {
   InvalidPasswordResetTokenException,
   InvalidRefreshTokenException,
   ResourceNotFoundException,
+  TooManyRequestsException,
 } from '../../application/exceptions';
 
 interface Problem {
   status: number;
   title: string;
   detail: string;
+  /** Có với lỗi 429: số giây client nên chờ, gửi lại qua header Retry-After. */
+  retryAfterSeconds?: number;
 }
 
 /** Chuẩn hóa mọi lỗi về ProblemDetails (application/problem+json), giống backend C#. */
@@ -48,10 +51,15 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       );
     }
 
+    const { retryAfterSeconds, ...body } = problem;
+    if (retryAfterSeconds !== undefined) {
+      response.setHeader('Retry-After', String(retryAfterSeconds));
+    }
+
     response
       .status(problem.status)
       .type('application/problem+json')
-      .json({ ...problem, instance: request.path });
+      .json({ ...body, instance: request.path });
   }
 
   private toProblem(exception: unknown): Problem {
@@ -73,6 +81,12 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     }
     if (exception instanceof CurrentPasswordIncorrectException) {
       return make(HttpStatus.BAD_REQUEST, 'Không thể đổi mật khẩu');
+    }
+    if (exception instanceof TooManyRequestsException) {
+      return {
+        ...make(HttpStatus.TOO_MANY_REQUESTS, 'Quá nhiều yêu cầu'),
+        retryAfterSeconds: exception.retryAfterSeconds,
+      };
     }
     if (exception instanceof InvalidPasswordResetTokenException) {
       return make(

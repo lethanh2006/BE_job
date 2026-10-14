@@ -7,9 +7,11 @@ import {
   ResetTokenGenerator,
 } from './application/abstractions/authentication';
 import { EmailSender } from './application/abstractions/email';
+import { RateLimitStore } from './application/abstractions/rate-limiting';
 import { ApplicationNotifier } from './application/abstractions/notifications';
 import { ApplicationQueryService } from './application/applications/application-query.service';
 import { ApplicationService } from './application/applications/application.service';
+import { LoginAttemptLimiter } from './application/auth/login-attempt-limiter';
 import { LoginService } from './application/auth/login.service';
 import { PasswordChangeService } from './application/auth/password-change.service';
 import {
@@ -42,6 +44,7 @@ import { JobsController } from './api/controllers/jobs.controller';
 import { NotificationsController } from './api/controllers/notifications.controller';
 import { SavedJobsController } from './api/controllers/saved-jobs.controller';
 import { ProblemDetailsFilter } from './api/errors/problem-details.filter';
+import { RateLimitGuard } from './api/rate-limit/rate-limit';
 import { AppConfig } from './config/app-config';
 import { Clock, SystemClock } from './domain';
 import { JwtAccessTokenGenerator } from './infrastructure/auth/jwt-access-token-generator';
@@ -50,6 +53,7 @@ import { SecureRefreshTokenGenerator } from './infrastructure/auth/secure-refres
 import { SecureResetTokenGenerator } from './infrastructure/auth/secure-reset-token-generator';
 import { createEmailSender } from './infrastructure/email/create-email-sender';
 import { persistenceProviders } from './infrastructure/persistence/persistence-providers';
+import { InMemoryRateLimitStore } from './infrastructure/rate-limiting/in-memory-rate-limit-store';
 
 @Module({
   controllers: [
@@ -78,6 +82,14 @@ import { persistenceProviders } from './infrastructure/persistence/persistence-p
           config.jwt.refreshTokenDays * 24 * 60 * 60 * 1000,
         ),
     },
+    { provide: RateLimitStore, useClass: InMemoryRateLimitStore },
+    {
+      provide: LoginAttemptLimiter,
+      inject: [RateLimitStore, Clock, AppConfig],
+      useFactory: (store: RateLimitStore, clock: Clock, config: AppConfig) =>
+        new LoginAttemptLimiter(store, clock, config.security.rateLimitEnabled),
+    },
+    RateLimitGuard,
     { provide: ResetTokenGenerator, useClass: SecureResetTokenGenerator },
     {
       provide: EmailSender,

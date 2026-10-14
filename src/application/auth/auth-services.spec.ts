@@ -6,6 +6,7 @@ import { InMemoryCompanyRepository } from '../../infrastructure/persistence/in-m
 import { JOB_SEED_FILE } from '../../infrastructure/seed/paths';
 import { InMemoryRefreshTokenRepository } from '../../infrastructure/persistence/in-memory-refresh-token-repository';
 import { InMemoryUserAccountRepository } from '../../infrastructure/persistence/in-memory-user-account-repository';
+import { InMemoryRateLimitStore } from '../../infrastructure/rate-limiting/in-memory-rate-limit-store';
 import { MutableClock } from '../../testing/test-helpers';
 import { AccessTokenGenerator } from '../abstractions/authentication';
 import {
@@ -15,7 +16,12 @@ import {
   EmailAlreadyExistsException,
   InvalidCredentialsException,
   InvalidRefreshTokenException,
+  TooManyRequestsException,
 } from '../exceptions';
+import {
+  LoginAttemptLimiter,
+  MAX_FAILURES_PER_CLIENT,
+} from './login-attempt-limiter';
 import { LoginService } from './login.service';
 import { AccessToken, AccountRole, UserAccount } from './models';
 import { PasswordChangeService } from './password-change.service';
@@ -65,6 +71,7 @@ async function createSystem() {
       accessTokens,
       refreshGenerator,
       refreshTokens,
+      new LoginAttemptLimiter(new InMemoryRateLimitStore(), clock),
     ),
     session: new SessionService(
       accounts,
@@ -126,6 +133,54 @@ describe('LoginService', () => {
     expect(unknown).toBeInstanceOf(InvalidCredentialsException);
     expect(wrong).toBeInstanceOf(InvalidCredentialsException);
     expect((unknown as Error).message).toBe((wrong as Error).message);
+  });
+});
+
+describe('LoginService: giới hạn đăng nhập sai', () => {
+  it('khóa sau 8 lần sai từ cùng IP, kể cả khi lần sau đúng mật khẩu', async () => {
+    const { login } = await createSystem();
+
+    for (let i = 0; i < MAX_FAILURES_PER_CLIENT; i++) {
+      await expect(
+        login.login('candidate@jobboard.vn', 'sai-mat-khau', 'ip1'),
+      ).rejects.toBeInstanceOf(InvalidCredentialsException);
+    }
+
+    await expect(
+      login.login('candidate@jobboard.vn', PASSWORD, 'ip1'),
+    ).rejects.toBeInstanceOf(TooManyRequestsException);
+    // IP khác của chính chủ vẫn đăng nhập được.
+    await expect(
+      login.login('candidate@jobboard.vn', PASSWORD, 'ip2'),
+    ).resolves.toMatchObject({ accessToken: 'access-20' });
+  });
+
+  it('đăng nhập đúng xóa số lần sai', async () => {
+    const { login } = await createSystem();
+    for (let i = 0; i < MAX_FAILURES_PER_CLIENT - 1; i++) {
+      await login.login('candidate@jobboard.vn', 'sai', 'ip1').catch(() => 0);
+    }
+
+    await login.login('candidate@jobboard.vn', PASSWORD, 'ip1');
+
+    for (let i = 0; i < MAX_FAILURES_PER_CLIENT - 1; i++) {
+      await login.login('candidate@jobboard.vn', 'sai', 'ip1').catch(() => 0);
+    }
+    await expect(
+      login.login('candidate@jobboard.vn', PASSWORD, 'ip1'),
+    ).resolves.toBeDefined();
+  });
+
+  it('không đếm yêu cầu thiếu email/mật khẩu', async () => {
+    const { login } = await createSystem();
+
+    for (let i = 0; i < MAX_FAILURES_PER_CLIENT * 2; i++) {
+      await login.login('candidate@jobboard.vn', '  ', 'ip1').catch(() => 0);
+    }
+
+    await expect(
+      login.login('candidate@jobboard.vn', PASSWORD, 'ip1'),
+    ).resolves.toBeDefined();
   });
 });
 

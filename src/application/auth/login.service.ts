@@ -10,6 +10,7 @@ import {
   AccountDisabledException,
   InvalidCredentialsException,
 } from '../exceptions';
+import { LoginAttemptLimiter } from './login-attempt-limiter';
 import { LoginResult, toAuthenticatedUser } from './models';
 
 const INVALID_MESSAGE = 'Email hoặc mật khẩu không chính xác.';
@@ -22,20 +23,31 @@ export class LoginService {
     private readonly accessTokens: AccessTokenGenerator,
     private readonly refreshTokenGenerator: RefreshTokenGenerator,
     private readonly refreshTokens: RefreshTokenRepository,
+    private readonly limiter: LoginAttemptLimiter,
   ) {}
 
-  async login(email: string, password: string): Promise<LoginResult> {
+  /** `client` là định danh nơi gửi yêu cầu (IP đã chuẩn hóa) để giới hạn số lần đăng nhập sai. */
+  async login(
+    email: string,
+    password: string,
+    client?: string,
+  ): Promise<LoginResult> {
     if (!email?.trim() || !password?.trim()) {
       throw new InvalidCredentialsException(INVALID_MESSAGE);
     }
 
-    const account = await this.accounts.findByEmail(email.trim().toLowerCase());
+    const normalizedEmail = email.trim().toLowerCase();
+    await this.limiter.assertAllowed(normalizedEmail, client);
+
+    const account = await this.accounts.findByEmail(normalizedEmail);
     if (
       !account ||
       !(await this.passwordHasher.verify(password, account.passwordHash))
     ) {
+      await this.limiter.recordFailure(normalizedEmail, client);
       throw new InvalidCredentialsException(INVALID_MESSAGE);
     }
+    await this.limiter.recordSuccess(normalizedEmail, client);
 
     // Chỉ báo "bị khóa" sau khi mật khẩu đúng để không lộ tài khoản nào tồn tại.
     if (account.disabled) {

@@ -68,6 +68,8 @@ npm run lint
 | `STORAGE_DIR` | `./storage` | Thư mục lưu tệp CV khi dùng PostgreSql (InMemory giữ tệp trong bộ nhớ) |
 | `FRONTEND_URL` | origin CORS đầu tiên (dev: `http://localhost:3000`) | Địa chỉ frontend để dựng liên kết đặt lại mật khẩu; **bắt buộc** ở production nếu không đặt `CORS_ALLOWED_ORIGINS` |
 | `PASSWORD_RESET_MINUTES` | `30` | Thời hạn liên kết đặt lại mật khẩu (1–1440 phút) |
+| `TRUST_PROXY` | dev: `loopback`; production: không tin ai | Proxy đứng trước API được tin để đọc IP thật từ `X-Forwarded-For`: số bước nhảy (`1`), danh sách IP/CIDR/từ khóa (`10.0.0.0/8,loopback`), `true` (tin tất cả, chỉ dùng khi proxy luôn ghi đè header) hoặc `false`. Đặt sai sẽ khiến mọi người dùng chung một IP hoặc cho phép giả mạo IP |
+| `RATE_LIMIT_ENABLED` | bật (tắt khi `NODE_ENV=test`) | Giới hạn tần suất cho các endpoint xác thực |
 | `EMAIL_PROVIDER` | `Log` | `Log` (ghi log, không gửi thật) hoặc `Smtp` |
 | `SMTP_HOST` / `SMTP_PORT` | — / `587` | Bắt buộc `SMTP_HOST` khi `EMAIL_PROVIDER=Smtp` |
 | `SMTP_SECURE` | `true` nếu cổng 465 | TLS ngay từ đầu kết nối; cổng khác dùng STARTTLS khi máy chủ hỗ trợ |
@@ -187,6 +189,22 @@ Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`,
   dùng PostgreSql, hoặc bộ nhớ khi dùng InMemory. Thông tin mô tả nằm ở bảng `candidate_files` (migration `0007`); index
   unique từng phần bảo đảm mỗi ứng viên chỉ có một CV hiện tại ngay cả khi hai lần tải chạy song song. Chưa có quét virus.
 
+## Giới hạn tần suất
+
+- Các endpoint xác thực có giới hạn theo IP (cửa sổ cố định, trả `429` ProblemDetails kèm `Retry-After` và header
+  `RateLimit-Limit/Remaining/Reset`): đăng nhập 30 lượt/15 phút, đăng ký (ứng viên và nhà tuyển dụng dùng chung) 10
+  lượt/giờ, quên mật khẩu 10 lượt/giờ, đặt lại mật khẩu 20 lượt/giờ, đổi mật khẩu 10 lượt/15 phút. Khai báo bằng
+  `@RateLimit({ name, limit, windowSeconds })` trên handler; bộ đếm nằm sau cổng `RateLimitStore`.
+- Đăng nhập chỉ đếm lần **sai** (kể cả email không tồn tại, để không lộ tài khoản): 8 lần sai với cùng email từ cùng IP thì
+  khóa cặp đó 15 phút (kể cả khi lần sau gõ đúng), 40 lần sai/giờ cho một email từ mọi IP thì khóa tài khoản; đăng nhập đúng
+  xóa bộ đếm. Khóa theo cặp (email, IP) để kẻ tấn công không khóa được chủ tài khoản khỏi chính IP của họ.
+- IPv6 được gom theo dải /64, IPv4-mapped (`::ffff:a.b.c.d`) quy về IPv4.
+- **Cần cấu hình `TRUST_PROXY` đúng**: frontend gọi API từ server nên IP của client chỉ đến được API qua `X-Forwarded-For`
+  do frontend chuyển tiếp. Dev tin loopback; production phải khai báo rõ địa chỉ của frontend/reverse proxy, nếu không mọi
+  người dùng dùng chung một bộ đếm. Header giả mạo bị bỏ qua khi nguồn không được tin.
+- Bộ đếm nằm trong bộ nhớ nên chỉ đúng với một instance và mất khi khởi động lại; chạy nhiều instance cần cài một
+  `RateLimitStore` dùng kho chung (Redis/cơ sở dữ liệu).
+
 ## Quên mật khẩu
 
 - `POST /auth/forgot-password` `{ email }` **luôn trả 202** dù email có tồn tại, bị khóa hay bị giới hạn tần suất,
@@ -202,7 +220,7 @@ Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`,
 - Gửi email qua cổng `EmailSender`: `EMAIL_PROVIDER=Log` (mặc định) chỉ ghi log, ngoài production in cả nội dung nên lấy
   được liên kết từ log khi phát triển, còn ở production **không** in nội dung vì có token; `Smtp` gửi thật bằng nodemailer
   (từ chối địa chỉ nhận có ký tự có thể chèn header). Lỗi gửi email chỉ được ghi log, không làm hỏng yêu cầu.
-- Chưa có giới hạn tần suất theo IP (chỉ giới hạn theo tài khoản) và việc gửi email chạy ngay trong request, chưa qua hàng đợi.
+- Ngoài giới hạn 3 email/giờ theo tài khoản còn có giới hạn theo IP (xem mục Giới hạn tần suất); việc gửi email chạy ngay trong request, chưa qua hàng đợi.
 
 ## Cơ sở dữ liệu
 

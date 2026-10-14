@@ -35,6 +35,16 @@ export interface PasswordResetConfig {
   tokenMinutes: number;
 }
 
+export interface SecurityConfig {
+  /** Giới hạn tần suất cho các endpoint xác thực; mặc định tắt khi NODE_ENV=test. */
+  rateLimitEnabled: boolean;
+  /**
+   * Giá trị cho Express `trust proxy`: những proxy đứng trước API được tin để lấy IP thật của client
+   * từ X-Forwarded-For. Đặt sai sẽ khiến mọi người dùng chung một IP hoặc cho phép giả mạo IP.
+   */
+  trustProxy: boolean | number | string[];
+}
+
 export type PersistenceProvider = 'InMemory' | 'PostgreSql';
 
 export interface PersistenceConfig {
@@ -73,6 +83,10 @@ export class AppConfig {
     readonly passwordReset: PasswordResetConfig = {
       resetPageUrl: `${DEV_FRONTEND_URL}/dat-lai-mat-khau`,
       tokenMinutes: 30,
+    },
+    readonly security: SecurityConfig = {
+      rateLimitEnabled: true,
+      trustProxy: false,
     },
   ) {}
 
@@ -138,7 +152,37 @@ export class AppConfig {
       resolve(env.STORAGE_DIR ?? 'storage'),
       AppConfig.emailFromEnv(env, isProduction),
       AppConfig.passwordResetFromEnv(env, origins, isProduction),
+      {
+        rateLimitEnabled: env.RATE_LIMIT_ENABLED
+          ? env.RATE_LIMIT_ENABLED === 'true'
+          : env.NODE_ENV !== 'test',
+        trustProxy: AppConfig.trustProxyFromEnv(env.TRUST_PROXY, isProduction),
+      },
     );
+  }
+
+  /** Ngoài production tin proxy loopback (frontend chạy cùng máy); production phải khai báo rõ. */
+  private static trustProxyFromEnv(
+    raw: string | undefined,
+    isProduction: boolean,
+  ): SecurityConfig['trustProxy'] {
+    const value = raw?.trim();
+    if (!value) return isProduction ? false : ['loopback'];
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    if (/^\d+$/.test(value)) {
+      const hops = Number(value);
+      return hops > 0 ? hops : false;
+    }
+
+    const entries = value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    if (entries.length === 0) {
+      throw new Error('TRUST_PROXY không hợp lệ.');
+    }
+    return entries;
   }
 
   private static emailFromEnv(
