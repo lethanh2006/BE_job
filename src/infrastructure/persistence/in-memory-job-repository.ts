@@ -54,6 +54,17 @@ export class InMemoryJobRepository extends JobRepository {
     return [...(await this.load()).values()];
   }
 
+  async getByIds(ids: readonly number[]): Promise<Job[]> {
+    const jobs = await this.load();
+    return ids.flatMap((id) => jobs.get(id) ?? []);
+  }
+
+  async getByCompanyId(companyId: number): Promise<Job[]> {
+    return [...(await this.load()).values()].filter(
+      (job) => job.companyId === companyId,
+    );
+  }
+
   async getNextId(): Promise<number> {
     await this.load();
     return ++this.lastId;

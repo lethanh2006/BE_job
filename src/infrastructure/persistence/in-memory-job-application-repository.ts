@@ -61,6 +61,22 @@ export class InMemoryJobApplicationRepository extends JobApplicationRepository {
     return Promise.resolve(this.sortedBy((a) => a.jobId === jobId));
   }
 
+  getByJobIds(jobIds: readonly number[]): Promise<JobApplication[]> {
+    const wanted = new Set(jobIds);
+    return Promise.resolve(this.sortedBy((a) => wanted.has(a.jobId)));
+  }
+
+  countByJobIds(jobIds: readonly number[]): Promise<Map<number, number>> {
+    const wanted = new Set(jobIds);
+    const counts = new Map<number, number>();
+    for (const application of this.applications.values()) {
+      if (wanted.has(application.jobId)) {
+        counts.set(application.jobId, (counts.get(application.jobId) ?? 0) + 1);
+      }
+    }
+    return Promise.resolve(counts);
+  }
+
   private sortedBy(
     predicate: (a: JobApplication) => boolean,
   ): JobApplication[] {

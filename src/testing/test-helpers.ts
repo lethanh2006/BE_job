@@ -80,6 +80,16 @@ export class FakeJobRepository extends JobRepository {
     return Promise.resolve([...this.jobs.values()]);
   }
 
+  getByIds(ids: readonly number[]): Promise<Job[]> {
+    return Promise.resolve(ids.flatMap((id) => this.jobs.get(id) ?? []));
+  }
+
+  getByCompanyId(companyId: number): Promise<Job[]> {
+    return Promise.resolve(
+      [...this.jobs.values()].filter((job) => job.companyId === companyId),
+    );
+  }
+
   getNextId(): Promise<number> {
     return Promise.resolve(Math.max(0, ...this.jobs.keys()) + 1);
   }

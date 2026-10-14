@@ -17,6 +17,10 @@ export class InMemoryCandidateRepository extends CandidateRepository {
     return Promise.resolve(this.candidates.get(id) ?? null);
   }
 
+  getByIds(ids: readonly number[]): Promise<Candidate[]> {
+    return Promise.resolve(ids.flatMap((id) => this.candidates.get(id) ?? []));
+  }
+
   add(entity: Candidate): Promise<void> {
     if (this.candidates.has(entity.id)) {
       return Promise.reject(

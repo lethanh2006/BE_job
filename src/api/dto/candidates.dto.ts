@@ -1,13 +1,28 @@
-import { IsArray, IsNumber, IsOptional, IsString } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class UpdateCandidateProfileDto {
-  @IsString() email!: string;
-  @IsOptional() @IsString() bio?: string | null;
+  @IsString() @MaxLength(320) email!: string;
+  @IsOptional() @IsString() @MaxLength(4000) bio?: string | null;
   /** Phải đi cùng `desiredSalaryMax`; bỏ trống cả hai để xóa khoảng lương. */
-  @IsOptional() @IsNumber() desiredSalaryMin?: number | null;
-  @IsOptional() @IsNumber() desiredSalaryMax?: number | null;
+  @IsOptional() @IsNumber() @Min(0) @Max(1_000_000_000) desiredSalaryMin?:
+    number | null;
+  @IsOptional() @IsNumber() @Min(0) @Max(1_000_000_000) desiredSalaryMax?:
+    number | null;
   /** Tối đa 30 kỹ năng, không phân biệt hoa thường. */
-  @IsArray() @IsString({ each: true }) skills!: string[];
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  skills!: string[];
 }
 
 export class CandidateProfileResponseDto {

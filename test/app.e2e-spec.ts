@@ -317,6 +317,111 @@ describe.each(backends)('JobBoard API (e2e) — $name', (backend) => {
         .expect(200);
     });
 
+    it('xem chi tiết và thay thế toàn bộ nội dung của một tin', async () => {
+      const created = await http()
+        .post('/api/employers/1/jobs')
+        .set(bearer(token))
+        .send({
+          ...newJob('2099-01-01T00:00:00Z'),
+          title: 'Bản nháp để sửa',
+          description: ['Mô tả A'],
+        })
+        .expect(201);
+      const id = created.body.id;
+
+      const detail = await http()
+        .get(`/api/employers/1/jobs/${id}`)
+        .set(bearer(token))
+        .expect(200);
+      expect(detail.body).toMatchObject({
+        title: 'Bản nháp để sửa',
+        description: ['Mô tả A'],
+        requirements: [],
+        skills: ['NestJS', 'TypeScript'],
+        status: 'Draft',
+      });
+
+      const updated = await http()
+        .put(`/api/employers/1/jobs/${id}`)
+        .set(bearer(token))
+        .send({
+          ...newJob('2099-06-01T00:00:00Z'),
+          title: 'Đã sửa',
+          level: 'Lead',
+          description: ['Mô tả B', 'Mô tả C'],
+          requirements: ['Yêu cầu 1'],
+          benefits: ['Quyền lợi 1'],
+          skills: ['Go'],
+        })
+        .expect(200);
+      expect(updated.body).toMatchObject({
+        title: 'Đã sửa',
+        level: 'Lead',
+        description: ['Mô tả B', 'Mô tả C'],
+        benefits: ['Quyền lợi 1'],
+        skills: ['Go'],
+      });
+
+      // Sửa tin đã đóng → 400.
+      await http()
+        .post(`/api/employers/1/jobs/${id}/publish`)
+        .set(bearer(token))
+        .expect(200);
+      await http()
+        .post(`/api/employers/1/jobs/${id}/close`)
+        .set(bearer(token))
+        .expect(200);
+      await http()
+        .put(`/api/employers/1/jobs/${id}`)
+        .set(bearer(token))
+        .send(newJob('2099-06-01T00:00:00Z'))
+        .expect(400);
+    });
+
+    it('từ chối dữ liệu quá dài và tin của công ty khác', async () => {
+      await http()
+        .post('/api/employers/1/jobs')
+        .set(bearer(token))
+        .send({ ...newJob('2099-01-01T00:00:00Z'), title: 'x'.repeat(201) })
+        .expect(400);
+      await http()
+        .get('/api/employers/2/jobs/1')
+        .set(bearer(token))
+        .expect(403);
+      await http()
+        .get('/api/employers/1/jobs/9999')
+        .set(bearer(token))
+        .expect(404);
+      // Tin #2 thuộc công ty khác: không được xem/sửa bằng token công ty 1.
+      await http()
+        .get('/api/employers/1/jobs/2')
+        .set(bearer(token))
+        .expect(403);
+    });
+
+    it('xem hồ sơ ứng viên kèm độ phù hợp; đơn công ty khác trả 404', async () => {
+      const list = await http()
+        .get('/api/employers/1/applications')
+        .set(bearer(token))
+        .expect(200);
+      expect(list.body[0]).toHaveProperty('matchScore');
+
+      const detail = await http()
+        .get(`/api/employers/1/applications/${list.body[0].id}`)
+        .set(bearer(token))
+        .expect(200);
+      expect(detail.body.candidate).toMatchObject({ id: 20 });
+      expect(detail.body.application.matchScore).toBe(list.body[0].matchScore);
+      expect(detail.body.matchedSkills).toEqual(expect.any(Array));
+      expect(detail.body).toHaveProperty('salaryFit');
+
+      // Đơn #2 thuộc tin của công ty khác.
+      await http()
+        .get('/api/employers/1/applications/2')
+        .set(bearer(token))
+        .expect(404);
+    });
+
     it('hạn nộp trong quá khứ → 400', async () => {
       await http()
         .post('/api/employers/1/jobs')

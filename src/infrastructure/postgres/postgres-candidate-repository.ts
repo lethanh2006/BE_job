@@ -17,6 +17,15 @@ export class PostgresCandidateRepository extends CandidateRepository {
     return rows[0] ? toCandidate(rows[0]) : null;
   }
 
+  async getByIds(ids: readonly number[]): Promise<Candidate[]> {
+    if (ids.length === 0) return [];
+    const { rows } = await this.db.query<CandidateRow>(
+      'SELECT * FROM candidates WHERE id = ANY($1::int[]) ORDER BY id',
+      [ids],
+    );
+    return rows.map(toCandidate);
+  }
+
   async add(entity: Candidate): Promise<void> {
     await insertCandidate(this.db, entity);
   }

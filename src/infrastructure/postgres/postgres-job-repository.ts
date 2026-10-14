@@ -30,6 +30,23 @@ export class PostgresJobRepository extends JobRepository {
     return rows.map((row) => toJob(row, this.clock));
   }
 
+  async getByIds(ids: readonly number[]): Promise<Job[]> {
+    if (ids.length === 0) return [];
+    const { rows } = await this.db.query<JobRow>(
+      'SELECT * FROM jobs WHERE id = ANY($1::int[]) ORDER BY id',
+      [ids],
+    );
+    return rows.map((row) => toJob(row, this.clock));
+  }
+
+  async getByCompanyId(companyId: number): Promise<Job[]> {
+    const { rows } = await this.db.query<JobRow>(
+      'SELECT * FROM jobs WHERE company_id = $1 ORDER BY id',
+      [companyId],
+    );
+    return rows.map((row) => toJob(row, this.clock));
+  }
+
   async getNextId(): Promise<number> {
     const { rows } = await this.db.query<{ id: number }>(
       "SELECT nextval('job_ids')::integer AS id",

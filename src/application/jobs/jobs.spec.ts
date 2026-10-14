@@ -221,6 +221,91 @@ describe('JobManagementService', () => {
   });
 });
 
+describe('JobManagementService - xem và sửa tin', () => {
+  const clock = new MutableClock();
+  const employerOf = (companyId: number) =>
+    new Employer(
+      1,
+      'Bình',
+      'b@x.vn',
+      new Company(companyId, `Công ty ${companyId}`),
+    );
+  const command = {
+    title: 'Tiêu đề mới',
+    location: 'Đà Nẵng',
+    salaryMin: 3000,
+    salaryMax: 4000,
+    deadline: new Date(clock.utcNow.getTime() + 30 * 86_400_000),
+    level: JobLevel.Lead,
+    workMode: 'Hybrid' as never,
+    category: 'DevOps',
+    summary: 'Tóm tắt',
+    description: ['Mô tả 1'],
+    requirements: ['Yêu cầu 1'],
+    benefits: ['Quyền lợi 1'],
+    skills: ['AWS', 'aws', 'K8s'],
+  };
+
+  function setup() {
+    const jobs = new FakeJobRepository().seed(
+      makeJob(clock, { id: 1, companyId: 30, publish: false, skills: ['Cũ'] }),
+    );
+    return {
+      jobs,
+      service: new JobManagementService(
+        jobs,
+        new InMemoryJobApplicationRepository(),
+        clock,
+      ),
+    };
+  }
+
+  it('thay toàn bộ nội dung, lưu lại và trả chi tiết đầy đủ', async () => {
+    const { jobs, service } = setup();
+
+    const detail = await service.update(1, employerOf(30), command);
+
+    expect(detail).toMatchObject({
+      title: 'Tiêu đề mới',
+      location: 'Đà Nẵng',
+      salaryMin: 3000,
+      level: JobLevel.Lead,
+      description: ['Mô tả 1'],
+      benefits: ['Quyền lợi 1'],
+      skills: ['AWS', 'K8s'],
+      status: JobStatus.Draft,
+    });
+    expect((await jobs.getById(1))!.title).toBe('Tiêu đề mới');
+  });
+
+  it('chỉ công ty sở hữu được xem/sửa; tin không tồn tại báo 404', async () => {
+    const { service } = setup();
+
+    await expect(
+      service.update(1, employerOf(99), command),
+    ).rejects.toBeInstanceOf(JobManagementForbiddenException);
+    await expect(service.getDetail(1, employerOf(99))).rejects.toBeInstanceOf(
+      JobManagementForbiddenException,
+    );
+    await expect(service.getDetail(404, employerOf(30))).rejects.toBeInstanceOf(
+      ResourceNotFoundException,
+    );
+    await expect(service.getDetail(1, employerOf(30))).resolves.toMatchObject({
+      skills: ['Cũ'],
+    });
+  });
+
+  it('tin đã đóng không sửa được', async () => {
+    const { service } = setup();
+    await service.publish(1, employerOf(30));
+    await service.close(1, employerOf(30));
+
+    await expect(service.update(1, employerOf(30), command)).rejects.toThrow(
+      'đã đóng',
+    );
+  });
+});
+
 describe('Skill trên tin', () => {
   it('không phân biệt hoa thường', () => {
     const job = makeJob(new MutableClock(), { skills: ['C#'] });

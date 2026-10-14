@@ -12,6 +12,7 @@ import { PasswordChangeService } from './application/auth/password-change.servic
 import { RegistrationService } from './application/auth/registration.service';
 import { SessionService } from './application/auth/session.service';
 import { CandidateProfileService } from './application/candidates/candidate-profile.service';
+import { JobMatchService } from './application/matching/job-match.service';
 import { JobDetailService } from './application/jobs/job-detail.service';
 import { JobManagementService } from './application/jobs/job-management.service';
 import { JobSearchService } from './application/jobs/job-search.service';
@@ -52,6 +53,7 @@ import { persistenceProviders } from './infrastructure/persistence/persistence-p
           config.jwt.refreshTokenDays * 24 * 60 * 60 * 1000,
         ),
     },
+    JobMatchService,
     JobSearchService,
     JobDetailService,
     JobManagementService,

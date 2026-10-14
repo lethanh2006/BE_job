@@ -213,6 +213,28 @@ describeWithPostgres('Tầng lưu trữ PostgreSQL', () => {
     );
   });
 
+  it('truy vấn theo lô: getByIds, getByCompanyId, countByJobIds', async () => {
+    const jobs = new PostgresJobRepository(db, clock);
+    const applications = new PostgresJobApplicationRepository(db);
+    const candidates = new PostgresCandidateRepository(db);
+
+    expect((await jobs.getByIds([1, 2, 999])).map((j) => j.id)).toEqual([1, 2]);
+    expect(await jobs.getByIds([])).toEqual([]);
+    expect((await jobs.getByCompanyId(1)).every((j) => j.companyId === 1)).toBe(
+      true,
+    );
+    expect((await candidates.getByIds([20, 999])).map((c) => c.id)).toEqual([
+      20,
+    ]);
+    expect(
+      (await applications.getByJobIds([2, 5])).map((a) => a.jobId).sort(),
+    ).toEqual([2, 5]);
+    const counts = await applications.countByJobIds([2, 5, 6, 1000]);
+    expect(counts.get(2)).toBe(1);
+    expect(counts.has(1000)).toBe(false);
+    expect((await applications.countByJobIds([])).size).toBe(0);
+  });
+
   it('cập nhật mật khẩu có điều kiện chỉ thành công với hash hiện tại', async () => {
     const accounts = new PostgresUserAccountRepository(db);
     const current = (await accounts.findById(20))!;

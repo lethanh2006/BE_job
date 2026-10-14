@@ -38,3 +38,15 @@ export class CompositeScorer implements JobMatchScorer {
     );
   }
 }
+
+/** Nhân điểm của scorer con với một trọng số (decorator, không sửa scorer gốc). */
+export class WeightedScorer implements JobMatchScorer {
+  constructor(
+    private readonly inner: JobMatchScorer,
+    private readonly weight: number,
+  ) {}
+
+  score(job: Job, candidate: Candidate): number {
+    return this.inner.score(job, candidate) * this.weight;
+  }
+}

@@ -8,8 +8,10 @@ import {
   InvalidJobStateException,
   Job,
   JobApplication,
+  JobLevel,
   JobManagementForbiddenException,
   JobStatus,
+  WorkMode,
   SalaryRange,
   Skill,
 } from './index';
@@ -90,6 +92,76 @@ describe('Job', () => {
     expect(job.addSkill(new Skill('c#'))).toBe(false);
     for (let i = 0; i < 14; i++) job.addSkill(new Skill(`skill-${i}`));
     expect(() => job.addSkill(new Skill('extra'))).toThrow(ArgumentError);
+  });
+});
+
+describe('Job.update', () => {
+  const content = (overrides: Partial<Parameters<Job['update']>[0]> = {}) => ({
+    title: '  Tiêu đề mới ',
+    salary: new SalaryRange(2000, 3000),
+    deadline: new Date('2026-12-01T00:00:00Z'),
+    location: ' Hà Nội ',
+    level: JobLevel.Senior,
+    workMode: WorkMode.Remote,
+    category: 'IT',
+    summary: ' tóm tắt ',
+    description: ['a', '  ', ' b '],
+    requirements: ['r'],
+    benefits: [],
+    ...overrides,
+  });
+
+  it('thay toàn bộ nội dung và kỹ năng, chuẩn hóa chuỗi', () => {
+    const job = makeJob();
+    job.addSkill(new Skill('Cũ'));
+
+    job.update(content(), [
+      new Skill('Go'),
+      new Skill('go'),
+      new Skill('Rust'),
+    ]);
+
+    expect(job).toMatchObject({
+      title: 'Tiêu đề mới',
+      location: 'Hà Nội',
+      level: JobLevel.Senior,
+      workMode: WorkMode.Remote,
+      summary: 'tóm tắt',
+    });
+    expect(job.salary.min).toBe(2000);
+    expect(job.description).toEqual(['a', 'b']);
+    expect(job.skills.map((s) => s.name)).toEqual(['Go', 'Rust']);
+  });
+
+  it('không sửa được tin đã đóng', () => {
+    const job = makeJob();
+    job.publish();
+    job.close();
+
+    expect(() => job.update(content(), [])).toThrow(InvalidJobStateException);
+  });
+
+  it('chỉ kiểm tra hạn tương lai khi hạn nộp thay đổi', () => {
+    const job = makeJob();
+
+    expect(() =>
+      job.update(content({ deadline: new Date('2026-09-01T00:00:00Z') }), []),
+    ).toThrow(ArgumentError);
+    // Giữ nguyên hạn nộp (kể cả đã quá hạn) thì vẫn sửa được nội dung khác.
+    expect(() =>
+      job.update(content({ deadline: job.deadline }), []),
+    ).not.toThrow();
+  });
+
+  it('từ chối tiêu đề rỗng và quá 15 kỹ năng, không làm hỏng dữ liệu cũ', () => {
+    const job = makeJob();
+    const tooMany = Array.from({ length: 16 }, (_, i) => new Skill(`s${i}`));
+
+    expect(() => job.update(content({ title: '  ' }), [])).toThrow(
+      ArgumentError,
+    );
+    expect(() => job.update(content(), tooMany)).toThrow(ArgumentError);
+    expect(job.title).toBe('Backend');
   });
 });
 

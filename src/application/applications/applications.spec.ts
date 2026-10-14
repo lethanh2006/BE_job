@@ -7,6 +7,8 @@ import {
   Employer,
   JobClosedException,
   JobManagementForbiddenException,
+  SalaryRange,
+  Skill,
 } from '../../domain';
 import { InMemoryCandidateRepository } from '../../infrastructure/persistence/in-memory-candidate-repository';
 import { InMemoryJobApplicationRepository } from '../../infrastructure/persistence/in-memory-job-application-repository';
@@ -16,6 +18,7 @@ import {
   MutableClock,
 } from '../../testing/test-helpers';
 import { ResourceNotFoundException } from '../exceptions';
+import { JobMatchService } from '../matching/job-match.service';
 import { ApplicationQueryService } from './application-query.service';
 import { ApplicationService } from './application.service';
 
@@ -126,7 +129,12 @@ describe('ApplicationQueryService', () => {
     const applications = new InMemoryJobApplicationRepository();
     const candidates = new InMemoryCandidateRepository();
     await candidates.add(new Candidate(20, 'Nguyễn An', 'an@x.vn'));
-    const service = new ApplicationQueryService(jobs, applications, candidates);
+    const service = new ApplicationQueryService(
+      jobs,
+      applications,
+      candidates,
+      new JobMatchService(),
+    );
     const apply = new ApplicationService(jobs, applications, clock);
     await apply.apply(20, 1);
     clock.advanceDays(1);
@@ -145,5 +153,80 @@ describe('ApplicationQueryService', () => {
       'Nguyễn An',
       'Ứng viên #21',
     ]);
+  });
+});
+
+describe('ApplicationQueryService - phía nhà tuyển dụng', () => {
+  const clock = new MutableClock();
+
+  async function setup() {
+    const jobs = new FakeJobRepository().seed(
+      makeJob(clock, {
+        id: 1,
+        companyId: 30,
+        skills: ['C#', 'Docker'],
+        salary: [1000, 2000],
+      }),
+      makeJob(clock, { id: 2, companyId: 31 }),
+    );
+    const applications = new InMemoryJobApplicationRepository();
+    const candidates = new InMemoryCandidateRepository();
+    const candidate = new Candidate(
+      20,
+      'Nguyễn An',
+      'an@x.vn',
+      'bio',
+      new SalaryRange(1500, 2500),
+    );
+    candidate.addSkill(new Skill('C#'));
+    await candidates.add(candidate);
+    await new ApplicationService(jobs, applications, clock).apply(20, 1);
+    await new ApplicationService(jobs, applications, clock).apply(20, 2);
+
+    return {
+      service: new ApplicationQueryService(
+        jobs,
+        applications,
+        candidates,
+        new JobMatchService(),
+      ),
+    };
+  }
+
+  it('danh sách của công ty chỉ gồm đơn vào tin của công ty và có điểm phù hợp', async () => {
+    const { service } = await setup();
+
+    const list = await service.getByCompanyId(30);
+
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({
+      jobId: 1,
+      candidateName: 'Nguyễn An',
+      matchScore: 65,
+    });
+  });
+
+  it('xem hồ sơ ứng viên: kỹ năng khớp/thiếu; đơn của công ty khác trả 404', async () => {
+    const { service } = await setup();
+
+    const detail = await service.getApplicant(30, 1);
+
+    expect(detail.candidate).toMatchObject({
+      id: 20,
+      name: 'Nguyễn An',
+      skills: ['C#'],
+    });
+    expect(detail).toMatchObject({
+      matchedSkills: ['C#'],
+      missingSkills: ['Docker'],
+      salaryFit: true,
+      application: { matchScore: 65 },
+    });
+    await expect(service.getApplicant(31, 1)).rejects.toBeInstanceOf(
+      ResourceNotFoundException,
+    );
+    await expect(service.getApplicant(30, 99)).rejects.toBeInstanceOf(
+      ResourceNotFoundException,
+    );
   });
 });

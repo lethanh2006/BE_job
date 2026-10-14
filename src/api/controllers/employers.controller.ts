@@ -8,6 +8,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -30,8 +31,15 @@ import {
   toEmployer,
 } from '../auth/auth';
 import { ApiProblems } from '../dto/api-responses';
-import { ApplicationDetailResponseDto } from '../dto/applications.dto';
-import { CreateJobDto, EmployerJobResponseDto } from '../dto/jobs.dto';
+import {
+  ApplicantDetailResponseDto,
+  EmployerApplicationResponseDto,
+} from '../dto/applications.dto';
+import {
+  CreateJobDto,
+  EmployerJobDetailResponseDto,
+  EmployerJobResponseDto,
+} from '../dto/jobs.dto';
 
 const notFoundOnNaN = () =>
   new ParseIntPipe({ errorHttpStatusCode: HttpStatus.NOT_FOUND });
@@ -84,6 +92,53 @@ export class EmployersController {
     });
   }
 
+  @Get('jobs/:jobId')
+  @ApiOperation({ summary: 'Xem toàn bộ nội dung một tin (kể cả bản nháp)' })
+  @ApiOkResponse({ type: EmployerJobDetailResponseDto })
+  @ApiProblems(
+    HttpStatus.UNAUTHORIZED,
+    HttpStatus.FORBIDDEN,
+    HttpStatus.NOT_FOUND,
+  )
+  getJob(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('companyId', notFoundOnNaN()) companyId: number,
+    @Param('jobId', notFoundOnNaN()) jobId: number,
+  ) {
+    assertCompanyScope(user, companyId);
+    return this.jobManagementService.getDetail(
+      jobId,
+      toEmployer(user, companyId),
+    );
+  }
+
+  @Put('jobs/:jobId')
+  @ApiOperation({
+    summary: 'Thay thế toàn bộ nội dung một tin',
+    description:
+      'Áp dụng cho tin nháp hoặc đang đăng; tin đã đóng không sửa được. Hạn nộp chỉ bị kiểm tra "ở tương lai" khi được thay đổi.',
+  })
+  @ApiOkResponse({ type: EmployerJobDetailResponseDto })
+  @ApiProblems(
+    HttpStatus.BAD_REQUEST,
+    HttpStatus.UNAUTHORIZED,
+    HttpStatus.FORBIDDEN,
+    HttpStatus.NOT_FOUND,
+  )
+  updateJob(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('companyId', notFoundOnNaN()) companyId: number,
+    @Param('jobId', notFoundOnNaN()) jobId: number,
+    @Body() body: CreateJobDto,
+  ) {
+    assertCompanyScope(user, companyId);
+    return this.jobManagementService.update(
+      jobId,
+      toEmployer(user, companyId),
+      body,
+    );
+  }
+
   @Post('jobs/:jobId/publish')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng tin (Draft → Published)' })
@@ -127,7 +182,7 @@ export class EmployersController {
 
   @Get('applications')
   @ApiOperation({ summary: 'Đơn ứng tuyển vào các tin của công ty' })
-  @ApiOkResponse({ type: [ApplicationDetailResponseDto] })
+  @ApiOkResponse({ type: [EmployerApplicationResponseDto] })
   @ApiProblems(HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN)
   getApplications(
     @CurrentUser() user: AuthPrincipal,
@@ -135,5 +190,26 @@ export class EmployersController {
   ) {
     assertCompanyScope(user, companyId);
     return this.applicationQueryService.getByCompanyId(companyId);
+  }
+
+  @Get('applications/:applicationId')
+  @ApiOperation({
+    summary: 'Xem hồ sơ ứng viên của một đơn',
+    description:
+      'Kèm độ phù hợp và danh sách kỹ năng khớp/thiếu so với tin. Đơn của công ty khác trả 404.',
+  })
+  @ApiOkResponse({ type: ApplicantDetailResponseDto })
+  @ApiProblems(
+    HttpStatus.UNAUTHORIZED,
+    HttpStatus.FORBIDDEN,
+    HttpStatus.NOT_FOUND,
+  )
+  getApplicant(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('companyId', notFoundOnNaN()) companyId: number,
+    @Param('applicationId', notFoundOnNaN()) applicationId: number,
+  ) {
+    assertCompanyScope(user, companyId);
+    return this.applicationQueryService.getApplicant(companyId, applicationId);
   }
 }

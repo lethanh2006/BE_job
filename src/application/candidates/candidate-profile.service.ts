@@ -26,7 +26,7 @@ export class CandidateProfileService {
   constructor(private readonly candidates: CandidateRepository) {}
 
   async getById(id: number): Promise<CandidateProfileDto> {
-    return toDto(await this.getCandidate(id));
+    return toCandidateProfileDto(await this.getCandidate(id));
   }
 
   async update(
@@ -43,7 +43,7 @@ export class CandidateProfileService {
     candidate.updateProfile(command.email, command.bio, salary, skills);
     await this.candidates.update(candidate);
 
-    return toDto(candidate);
+    return toCandidateProfileDto(candidate);
   }
 
   private async getCandidate(id: number): Promise<Candidate> {
@@ -70,7 +70,9 @@ function createSalaryRange(
   return new SalaryRange(min, max);
 }
 
-const toDto = (candidate: Candidate): CandidateProfileDto => ({
+export const toCandidateProfileDto = (
+  candidate: Candidate,
+): CandidateProfileDto => ({
   id: candidate.id,
   name: candidate.name,
   email: candidate.email,

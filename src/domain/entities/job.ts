@@ -33,23 +33,54 @@ function normalizeItems(items?: Iterable<string> | null): string[] {
     .map((item) => item.trim());
 }
 
+/** Phần nội dung của tin mà nhà tuyển dụng được phép chỉnh sửa. */
+export interface JobContent {
+  title: string;
+  salary: SalaryRange;
+  deadline: Date;
+  location: string;
+  level: JobLevel;
+  workMode: WorkMode;
+  category: string;
+  summary: string;
+  description: readonly string[];
+  requirements: readonly string[];
+  benefits: readonly string[];
+}
+
+function normalizeContent(
+  input: Omit<JobContent, 'description' | 'requirements' | 'benefits'> & {
+    description?: Iterable<string> | null;
+    requirements?: Iterable<string> | null;
+    benefits?: Iterable<string> | null;
+  },
+): JobContent {
+  if (typeof input.title !== 'string' || input.title.trim() === '') {
+    throw new ArgumentError('Tiêu đề công việc không được để trống.');
+  }
+
+  return {
+    title: input.title.trim(),
+    salary: input.salary,
+    deadline: input.deadline,
+    location: (input.location ?? '').trim(),
+    level: input.level,
+    workMode: input.workMode,
+    category: (input.category ?? '').trim(),
+    summary: (input.summary ?? '').trim(),
+    description: normalizeItems(input.description),
+    requirements: normalizeItems(input.requirements),
+    benefits: normalizeItems(input.benefits),
+  };
+}
+
 export class Job {
   readonly id: number;
-  readonly title: string;
   readonly companyId: number;
   readonly company: Company | null;
-  readonly salary: SalaryRange;
-  readonly deadline: Date;
-  readonly location: string;
-  readonly level: JobLevel;
-  readonly workMode: WorkMode;
-  readonly category: string;
-  readonly summary: string;
-  readonly description: readonly string[];
-  readonly requirements: readonly string[];
-  readonly benefits: readonly string[];
   readonly postedAt: Date;
   readonly featured: boolean;
+  private content: JobContent;
   private currentStatus: JobStatus;
   private readonly skillSet = new SkillSet();
   private readonly clock: Clock;
@@ -60,9 +91,6 @@ export class Job {
     status: JobStatus,
     validateFutureDeadline: boolean,
   ) {
-    if (typeof props.title !== 'string' || props.title.trim() === '') {
-      throw new ArgumentError('Tiêu đề công việc không được để trống.');
-    }
     if (!(props.companyId > 0)) {
       throw new ArgumentError('CompanyId phải lớn hơn 0.');
     }
@@ -79,19 +107,16 @@ export class Job {
     }
 
     this.id = props.id;
-    this.title = props.title.trim();
     this.companyId = props.companyId;
     this.company = props.company ?? null;
-    this.salary = props.salary;
-    this.deadline = props.deadline;
-    this.location = (props.location ?? '').trim();
-    this.level = props.level ?? JobLevel.Middle;
-    this.workMode = props.workMode ?? WorkMode.Onsite;
-    this.category = (props.category ?? '').trim();
-    this.summary = (props.summary ?? '').trim();
-    this.description = normalizeItems(props.description);
-    this.requirements = normalizeItems(props.requirements);
-    this.benefits = normalizeItems(props.benefits);
+    this.content = normalizeContent({
+      ...props,
+      location: props.location ?? '',
+      category: props.category ?? '',
+      summary: props.summary ?? '',
+      level: props.level ?? JobLevel.Middle,
+      workMode: props.workMode ?? WorkMode.Onsite,
+    });
     this.postedAt = props.postedAt ?? props.clock.utcNow;
     this.featured = props.featured ?? false;
     this.currentStatus = status;
@@ -108,6 +133,50 @@ export class Job {
     return new Job(props, props.status, false);
   }
 
+  get title(): string {
+    return this.content.title;
+  }
+
+  get salary(): SalaryRange {
+    return this.content.salary;
+  }
+
+  get deadline(): Date {
+    return this.content.deadline;
+  }
+
+  get location(): string {
+    return this.content.location;
+  }
+
+  get level(): JobLevel {
+    return this.content.level;
+  }
+
+  get workMode(): WorkMode {
+    return this.content.workMode;
+  }
+
+  get category(): string {
+    return this.content.category;
+  }
+
+  get summary(): string {
+    return this.content.summary;
+  }
+
+  get description(): readonly string[] {
+    return this.content.description;
+  }
+
+  get requirements(): readonly string[] {
+    return this.content.requirements;
+  }
+
+  get benefits(): readonly string[] {
+    return this.content.benefits;
+  }
+
   get status(): JobStatus {
     return this.currentStatus;
   }
@@ -118,6 +187,46 @@ export class Job {
 
   get isExpired(): boolean {
     return this.deadline.getTime() <= this.clock.utcNow.getTime();
+  }
+
+  /**
+   * Thay toàn bộ nội dung và kỹ năng. Không sửa được tin đã đóng; hạn nộp chỉ được
+   * kiểm tra "ở tương lai" khi người dùng đổi nó (để vẫn sửa được nội dung tin đã quá hạn).
+   */
+  update(
+    content: Omit<JobContent, 'description' | 'requirements' | 'benefits'> & {
+      description?: Iterable<string> | null;
+      requirements?: Iterable<string> | null;
+      benefits?: Iterable<string> | null;
+    },
+    skills: Iterable<Skill>,
+  ): void {
+    if (this.currentStatus === JobStatus.Closed) {
+      throw new InvalidJobStateException(
+        'Tin tuyển dụng đã đóng không thể chỉnh sửa.',
+      );
+    }
+
+    const next = normalizeContent(content);
+    const deadlineChanged =
+      next.deadline.getTime() !== this.content.deadline.getTime();
+    if (
+      deadlineChanged &&
+      next.deadline.getTime() <= this.clock.utcNow.getTime()
+    ) {
+      throw new ArgumentError('Hạn nộp hồ sơ phải ở tương lai.');
+    }
+
+    const nextSkills = new SkillSet(skills);
+    if (nextSkills.size > MAX_SKILLS_PER_JOB) {
+      throw new ArgumentError(
+        `Một tin tuyển dụng không được có quá ${MAX_SKILLS_PER_JOB} kỹ năng.`,
+      );
+    }
+
+    this.content = next;
+    this.skillSet.clear();
+    nextSkills.values().forEach((skill) => this.skillSet.add(skill));
   }
 
   /** Đăng ký lắng nghe sự kiện tin được đăng (tương đương event Job.Published). */

@@ -54,6 +54,26 @@ export class PostgresJobApplicationRepository extends JobApplicationRepository {
     return rows.map(toApplication);
   }
 
+  async getByJobIds(jobIds: readonly number[]): Promise<JobApplication[]> {
+    if (jobIds.length === 0) return [];
+    const { rows } = await this.db.query<ApplicationRow>(
+      `SELECT * FROM job_applications WHERE job_id = ANY($1::int[])
+        ORDER BY applied_at DESC, id DESC`,
+      [jobIds],
+    );
+    return rows.map(toApplication);
+  }
+
+  async countByJobIds(jobIds: readonly number[]): Promise<Map<number, number>> {
+    if (jobIds.length === 0) return new Map();
+    const { rows } = await this.db.query<{ job_id: number; total: string }>(
+      `SELECT job_id, count(*) AS total FROM job_applications
+        WHERE job_id = ANY($1::int[]) GROUP BY job_id`,
+      [jobIds],
+    );
+    return new Map(rows.map((row) => [row.job_id, Number(row.total)]));
+  }
+
   async add(entity: JobApplication): Promise<void> {
     try {
       await insertApplication(this.db, entity);

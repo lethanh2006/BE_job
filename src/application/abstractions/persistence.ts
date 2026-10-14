@@ -12,12 +12,15 @@ export abstract class JobRepository implements Repository<Job> {
   abstract update(entity: Job): Promise<void>;
   abstract getNextId(): Promise<number>;
   abstract getAll(): Promise<Job[]>;
+  abstract getByIds(ids: readonly number[]): Promise<Job[]>;
+  abstract getByCompanyId(companyId: number): Promise<Job[]>;
 }
 
 export abstract class CandidateRepository implements Repository<Candidate> {
   abstract getById(id: number): Promise<Candidate | null>;
   abstract add(entity: Candidate): Promise<void>;
   abstract update(entity: Candidate): Promise<void>;
+  abstract getByIds(ids: readonly number[]): Promise<Candidate[]>;
 }
 
 export abstract class JobApplicationRepository implements Repository<JobApplication> {
@@ -29,4 +32,9 @@ export abstract class JobApplicationRepository implements Repository<JobApplicat
   abstract hasApplied(candidateId: number, jobId: number): Promise<boolean>;
   abstract getByCandidateId(candidateId: number): Promise<JobApplication[]>;
   abstract getByJobId(jobId: number): Promise<JobApplication[]>;
+  abstract getByJobIds(jobIds: readonly number[]): Promise<JobApplication[]>;
+  /** Số đơn theo từng tin; tin chưa có đơn không xuất hiện trong kết quả. */
+  abstract countByJobIds(
+    jobIds: readonly number[],
+  ): Promise<Map<number, number>>;
 }
