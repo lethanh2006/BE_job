@@ -12,6 +12,8 @@ export class JobApplication {
     readonly candidateId: number,
     readonly appliedAt: Date,
     status: ApplicationStatus = ApplicationStatus.Submitted,
+    /** Tệp CV ứng viên đính kèm lúc nộp (bản chụp tại thời điểm nộp). */
+    readonly cvFileId: string | null = null,
   ) {
     if (!(jobId > 0)) throw new ArgumentError('JobId phải lớn hơn 0.');
     if (!(candidateId > 0)) {
@@ -50,6 +52,7 @@ export class JobApplication {
       candidateId: this.candidateId,
       status: this.currentStatus,
       appliedAt: this.appliedAt,
+      cvAttached: this.cvFileId !== null,
     };
   }
 }

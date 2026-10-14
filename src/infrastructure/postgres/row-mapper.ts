@@ -61,6 +61,7 @@ export interface ApplicationRow {
   candidate_id: number;
   status: ApplicationStatus;
   applied_at: Date;
+  cv_file_id: string | null;
 }
 
 export interface UserAccountRow {
@@ -189,6 +190,7 @@ export function toApplication(row: ApplicationRow): JobApplication {
     row.candidate_id,
     row.applied_at,
     row.status,
+    row.cv_file_id,
   );
 }
 

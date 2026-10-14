@@ -1,24 +1,40 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
+  Header,
+  HttpCode,
   HttpStatus,
   Param,
   ParseIntPipe,
+  Post,
   Put,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
 import { ApplicationQueryService } from '../../application/applications/application-query.service';
 import { AccountRole } from '../../application/auth';
 import { CandidateMatchService } from '../../application/matching/candidate-match.service';
+import {
+  CandidateCvService,
+  CV_MAX_BYTES,
+} from '../../application/candidates/candidate-cv.service';
 import { CandidateProfileService } from '../../application/candidates/candidate-profile.service';
 import {
   AuthPrincipal,
@@ -28,9 +44,11 @@ import {
   RolesGuard,
 } from '../auth/auth';
 import { ApiProblems } from '../dto/api-responses';
+import { decodeUploadedFileName, toDownload } from '../files/file-http';
 import { ApplicationDetailResponseDto } from '../dto/applications.dto';
 import {
-  CandidateProfileResponseDto,
+  CvInfoResponseDto,
+  OwnCandidateProfileResponseDto,
   JobMatchesQueryDto,
   JobMatchResponseDto,
   RecommendedJobResponseDto,
@@ -59,11 +77,12 @@ export class CandidatesController {
     private readonly applicationQueryService: ApplicationQueryService,
     private readonly candidateProfileService: CandidateProfileService,
     private readonly candidateMatchService: CandidateMatchService,
+    private readonly cvService: CandidateCvService,
   ) {}
 
   @Get(':candidateId/profile')
   @ApiOperation({ summary: 'Xem hồ sơ của chính mình' })
-  @ApiOkResponse({ type: CandidateProfileResponseDto })
+  @ApiOkResponse({ type: OwnCandidateProfileResponseDto })
   @ApiProblems(
     HttpStatus.UNAUTHORIZED,
     HttpStatus.FORBIDDEN,
@@ -81,7 +100,7 @@ export class CandidatesController {
   @ApiOperation({
     summary: 'Cập nhật hồ sơ, khoảng lương mong muốn và kỹ năng',
   })
-  @ApiOkResponse({ type: CandidateProfileResponseDto })
+  @ApiOkResponse({ type: OwnCandidateProfileResponseDto })
   @ApiProblems(
     HttpStatus.BAD_REQUEST,
     HttpStatus.UNAUTHORIZED,
@@ -151,5 +170,79 @@ export class CandidatesController {
   ) {
     assertSelf(user, candidateId);
     return this.candidateMatchService.recommend(candidateId, query.limit ?? 6);
+  }
+
+  @Post(':candidateId/cv')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: CV_MAX_BYTES, files: 1 } }),
+  )
+  @ApiOperation({
+    summary: 'Tải CV lên (thay thế CV hiện tại)',
+    description:
+      'Chỉ nhận PDF, DOC, DOCX tối đa 5 MB; loại tệp được xác định theo nội dung chứ không theo đuôi tệp. Đơn đã nộp giữ CV tại thời điểm nộp.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiCreatedResponse({ type: CvInfoResponseDto })
+  @ApiProblems(
+    HttpStatus.BAD_REQUEST,
+    HttpStatus.UNAUTHORIZED,
+    HttpStatus.FORBIDDEN,
+    HttpStatus.PAYLOAD_TOO_LARGE,
+  )
+  uploadCv(
+    @CurrentUser() user: AuthPrincipal,
+    @CandidateId() candidateId: number,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    assertSelf(user, candidateId);
+    return this.cvService.upload(
+      candidateId,
+      file && {
+        originalName: decodeUploadedFileName(file.originalname),
+        content: file.buffer,
+      },
+    );
+  }
+
+  @Get(':candidateId/cv')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({ summary: 'Tải về CV hiện tại của chính mình' })
+  @ApiProduces('application/pdf', 'application/msword')
+  @ApiProblems(
+    HttpStatus.UNAUTHORIZED,
+    HttpStatus.FORBIDDEN,
+    HttpStatus.NOT_FOUND,
+  )
+  async downloadCv(
+    @CurrentUser() user: AuthPrincipal,
+    @CandidateId() candidateId: number,
+  ) {
+    assertSelf(user, candidateId);
+    return toDownload(await this.cvService.download(candidateId));
+  }
+
+  @Delete(':candidateId/cv')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Xóa CV hiện tại',
+    description:
+      'Đơn đã nộp kèm CV này vẫn giữ bản của chúng; tệp chỉ bị xóa hẳn khi không còn đơn nào tham chiếu.',
+  })
+  @ApiNoContentResponse()
+  @ApiProblems(HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN)
+  async removeCv(
+    @CurrentUser() user: AuthPrincipal,
+    @CandidateId() candidateId: number,
+  ) {
+    assertSelf(user, candidateId);
+    await this.cvService.remove(candidateId);
   }
 }

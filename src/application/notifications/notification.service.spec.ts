@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { Candidate, Company, Employer, SalaryRange, Skill } from '../../domain';
+import { InMemoryCandidateFileRepository } from '../../infrastructure/persistence/in-memory-candidate-file-repository';
 import { InMemoryCandidateRepository } from '../../infrastructure/persistence/in-memory-candidate-repository';
 import { InMemoryNotificationRepository } from '../../infrastructure/persistence/in-memory-notification-repository';
 import { InMemoryUserAccountRepository } from '../../infrastructure/persistence/in-memory-user-account-repository';
@@ -45,7 +46,13 @@ describe('NotificationService', () => {
     const { clock, repository, candidates, companies, service } = await setup();
     const jobs = new FakeJobRepository().seed(makeJob(clock, { companyId: 1 }));
     const applications = new InMemoryJobApplicationRepository();
-    const apply = new ApplicationService(jobs, applications, clock, service);
+    const apply = new ApplicationService(
+      jobs,
+      applications,
+      clock,
+      service,
+      new InMemoryCandidateFileRepository(applications),
+    );
     const log = jest
       .spyOn(Logger.prototype, 'error')
       .mockImplementation(() => undefined);

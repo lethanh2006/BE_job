@@ -45,3 +45,6 @@ Thumbs.db
 # Misc
 .eslintcache
 .cache/
+
+# CV ứng viên khi chạy với PostgreSql (STORAGE_DIR mặc định); neo ở gốc để không nuốt src/infrastructure/storage/
+/storage/

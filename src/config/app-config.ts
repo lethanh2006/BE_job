@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+
 export interface JwtConfig {
   issuer: string;
   audience: string;
@@ -31,6 +33,8 @@ export class AppConfig {
     },
     /** Phát OpenAPI/Swagger UI; mặc định bật ở môi trường không phải production. */
     readonly openApiEnabled = false,
+    /** Thư mục lưu tệp CV khi dùng PostgreSql (provider InMemory giữ tệp trong bộ nhớ). */
+    readonly storageDirectory = resolve('storage'),
   ) {}
 
   /** Đọc cấu hình từ biến môi trường; thiếu/không hợp lệ thì dừng ngay khi khởi động. */
@@ -92,6 +96,7 @@ export class AppConfig {
         applyMigrations: env.PERSISTENCE_APPLY_MIGRATIONS === 'true',
       },
       env.OPENAPI_ENABLED ? env.OPENAPI_ENABLED === 'true' : !isProduction,
+      resolve(env.STORAGE_DIR ?? 'storage'),
     );
   }
 }

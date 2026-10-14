@@ -120,6 +120,12 @@ export class ProblemDetailsFilter implements ExceptionFilter {
           title: 'Không có quyền thực hiện',
           detail: 'Tài khoản không có quyền truy cập tài nguyên này.',
         };
+      case Number(HttpStatus.PAYLOAD_TOO_LARGE):
+        return {
+          status,
+          title: 'Tệp quá lớn',
+          detail: 'Tệp tải lên vượt quá dung lượng cho phép (5 MB).',
+        };
       case Number(HttpStatus.NOT_FOUND):
         return {
           status,

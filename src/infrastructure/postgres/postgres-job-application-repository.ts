@@ -104,14 +104,15 @@ export async function insertApplication(
   application: JobApplication,
 ): Promise<void> {
   await db.query(
-    `INSERT INTO job_applications (id, job_id, candidate_id, status, applied_at)
-     VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO job_applications (id, job_id, candidate_id, status, applied_at, cv_file_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       application.id,
       application.jobId,
       application.candidateId,
       application.status,
       application.appliedAt,
+      application.cvFileId,
     ],
   );
 }

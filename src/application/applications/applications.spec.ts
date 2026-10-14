@@ -11,6 +11,7 @@ import {
   SalaryRange,
   Skill,
 } from '../../domain';
+import { InMemoryCandidateFileRepository } from '../../infrastructure/persistence/in-memory-candidate-file-repository';
 import { InMemoryCandidateRepository } from '../../infrastructure/persistence/in-memory-candidate-repository';
 import { InMemoryJobApplicationRepository } from '../../infrastructure/persistence/in-memory-job-application-repository';
 import {
@@ -32,7 +33,13 @@ describe('ApplicationService', () => {
   beforeEach(() => {
     jobs = new FakeJobRepository();
     applications = new InMemoryJobApplicationRepository();
-    service = new ApplicationService(jobs, applications, clock, makeNotifier());
+    service = new ApplicationService(
+      jobs,
+      applications,
+      clock,
+      makeNotifier(),
+      new InMemoryCandidateFileRepository(applications),
+    );
   });
 
   it('ứng tuyển tin đang đăng tạo đơn Submitted và lưu lại', async () => {
@@ -135,12 +142,14 @@ describe('ApplicationQueryService', () => {
       applications,
       candidates,
       new JobMatchService(),
+      new InMemoryCandidateFileRepository(applications),
     );
     const apply = new ApplicationService(
       jobs,
       applications,
       clock,
       makeNotifier(),
+      new InMemoryCandidateFileRepository(applications),
     );
     await apply.apply(20, 1);
     clock.advanceDays(1);
@@ -191,12 +200,14 @@ describe('ApplicationQueryService - phía nhà tuyển dụng', () => {
       applications,
       clock,
       makeNotifier(),
+      new InMemoryCandidateFileRepository(applications),
     ).apply(20, 1);
     await new ApplicationService(
       jobs,
       applications,
       clock,
       makeNotifier(),
+      new InMemoryCandidateFileRepository(applications),
     ).apply(20, 2);
 
     return {
@@ -205,6 +216,7 @@ describe('ApplicationQueryService - phía nhà tuyển dụng', () => {
         applications,
         candidates,
         new JobMatchService(),
+        new InMemoryCandidateFileRepository(applications),
       ),
     };
   }

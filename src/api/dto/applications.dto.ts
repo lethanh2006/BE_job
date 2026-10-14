@@ -1,6 +1,10 @@
 import { IsEnum, IsInt } from 'class-validator';
 import { ApplicationStatus } from '../../domain';
-import { CandidateProfileResponseDto } from './candidates.dto';
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  CandidateProfileResponseDto,
+  CvInfoResponseDto,
+} from './candidates.dto';
 
 export class ApplyDto {
   @IsInt() jobId!: number;
@@ -17,6 +21,8 @@ export class ApplicationResponseDto {
   candidateId!: number;
   status!: ApplicationStatus;
   appliedAt!: Date;
+  /** Đã đính kèm CV hiện tại của ứng viên lúc nộp. */
+  cvAttached!: boolean;
 }
 
 /** Đơn ứng tuyển kèm thông tin tin tuyển dụng, dùng cho màn hình danh sách. */
@@ -42,4 +48,7 @@ export class ApplicantDetailResponseDto {
   missingSkills!: string[];
   /** Khoảng lương mong muốn của ứng viên giao với khoảng lương của tin. */
   salaryFit!: boolean;
+  /** CV đính kèm đơn (bản tại thời điểm nộp); tải bằng endpoint `/cv` của đơn. */
+  @ApiProperty({ type: CvInfoResponseDto, nullable: true })
+  cv!: CvInfoResponseDto | null;
 }

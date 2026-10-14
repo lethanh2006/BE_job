@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
@@ -15,8 +16,10 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
+import { CandidateCvService } from '../../application/candidates/candidate-cv.service';
 import { CompanyService } from '../../application/companies/company.service';
 import { ApplicationQueryService } from '../../application/applications/application-query.service';
 import { AccountRole } from '../../application/auth';
@@ -31,6 +34,7 @@ import {
   toEmployer,
 } from '../auth/auth';
 import { ApiProblems } from '../dto/api-responses';
+import { toDownload } from '../files/file-http';
 import {
   ApplicantDetailResponseDto,
   EmployerApplicationResponseDto,
@@ -58,6 +62,7 @@ export class EmployersController {
     private readonly jobManagementService: JobManagementService,
     private readonly applicationQueryService: ApplicationQueryService,
     private readonly companyService: CompanyService,
+    private readonly cvService: CandidateCvService,
   ) {}
 
   @Get('jobs')
@@ -248,5 +253,30 @@ export class EmployersController {
   ) {
     assertCompanyScope(user, companyId);
     return this.companyService.updateProfile(companyId, body);
+  }
+
+  @Get('applications/:applicationId/cv')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: 'Tải CV ứng viên đính kèm một đơn',
+    description:
+      'Chỉ công ty sở hữu tin tải được; đơn của công ty khác hoặc đơn không có CV trả 404.',
+  })
+  @ApiProduces('application/pdf', 'application/msword')
+  @ApiProblems(
+    HttpStatus.UNAUTHORIZED,
+    HttpStatus.FORBIDDEN,
+    HttpStatus.NOT_FOUND,
+  )
+  async downloadApplicantCv(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('companyId', notFoundOnNaN()) companyId: number,
+    @Param('applicationId', notFoundOnNaN()) applicationId: number,
+  ) {
+    assertCompanyScope(user, companyId);
+    return toDownload(
+      await this.cvService.downloadForApplication(companyId, applicationId),
+    );
   }
 }

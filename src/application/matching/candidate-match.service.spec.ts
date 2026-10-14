@@ -1,5 +1,6 @@
 import { makeNotifier } from '../../testing/test-helpers';
 import { Candidate, JobStatus, SalaryRange, Skill } from '../../domain';
+import { InMemoryCandidateFileRepository } from '../../infrastructure/persistence/in-memory-candidate-file-repository';
 import { InMemoryCandidateRepository } from '../../infrastructure/persistence/in-memory-candidate-repository';
 import { InMemoryJobApplicationRepository } from '../../infrastructure/persistence/in-memory-job-application-repository';
 import { InMemoryJobSearchReader } from '../../infrastructure/persistence/in-memory-job-search-reader';
@@ -38,7 +39,13 @@ describe('CandidateMatchService', () => {
     return {
       applications,
       jobs,
-      apply: new ApplicationService(jobs, applications, clock, makeNotifier()),
+      apply: new ApplicationService(
+        jobs,
+        applications,
+        clock,
+        makeNotifier(),
+        new InMemoryCandidateFileRepository(applications),
+      ),
       service: new CandidateMatchService(
         candidates,
         jobs,

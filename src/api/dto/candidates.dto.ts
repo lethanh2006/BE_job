@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -78,4 +79,18 @@ export class JobMatchResponseDto {
 
 export class RecommendedJobResponseDto extends JobSummaryResponseDto {
   matchScore!: number;
+}
+
+/** Thông tin CV (không gồm nội dung); tải nội dung qua endpoint tải về riêng. */
+export class CvInfoResponseDto {
+  fileName!: string;
+  contentType!: string;
+  sizeBytes!: number;
+  uploadedAt!: Date;
+}
+
+/** Hồ sơ nhìn từ chính ứng viên, kèm CV hiện tại. */
+export class OwnCandidateProfileResponseDto extends CandidateProfileResponseDto {
+  @ApiProperty({ type: CvInfoResponseDto, nullable: true })
+  cv!: CvInfoResponseDto | null;
 }

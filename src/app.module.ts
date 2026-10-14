@@ -15,6 +15,7 @@ import { SessionService } from './application/auth/session.service';
 import { AdminModerationService } from './application/admin/admin-moderation.service';
 import { AdminQueryService } from './application/admin/admin-query.service';
 import { CompanyService } from './application/companies/company.service';
+import { CandidateCvService } from './application/candidates/candidate-cv.service';
 import { CandidateProfileService } from './application/candidates/candidate-profile.service';
 import { SavedJobService } from './application/candidates/saved-job.service';
 import { CandidateMatchService } from './application/matching/candidate-match.service';
@@ -79,6 +80,7 @@ import { persistenceProviders } from './infrastructure/persistence/persistence-p
     ApplicationService,
     ApplicationQueryService,
     CandidateProfileService,
+    CandidateCvService,
     CompanyService,
     AdminQueryService,
     AdminModerationService,

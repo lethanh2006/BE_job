@@ -8,6 +8,7 @@ import {
   JobManagementForbiddenException,
   JobStatus,
 } from '../../domain';
+import { InMemoryCandidateFileRepository } from '../../infrastructure/persistence/in-memory-candidate-file-repository';
 import { InMemoryAdminReader } from '../../infrastructure/persistence/in-memory-admin-reader';
 import { InMemoryAuditLogRepository } from '../../infrastructure/persistence/in-memory-audit-log-repository';
 import { InMemoryCandidateRepository } from '../../infrastructure/persistence/in-memory-candidate-repository';
@@ -87,7 +88,13 @@ async function setup() {
       clock,
       makeNotifier(),
     ),
-    apply: new ApplicationService(jobs, applications, clock, makeNotifier()),
+    apply: new ApplicationService(
+      jobs,
+      applications,
+      clock,
+      makeNotifier(),
+      new InMemoryCandidateFileRepository(applications),
+    ),
   };
 }
 

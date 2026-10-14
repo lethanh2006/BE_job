@@ -1,4 +1,3 @@
-import { ApplicationNotifier } from '../abstractions/notifications';
 import { Injectable } from '@nestjs/common';
 import {
   AlreadyAppliedException,
@@ -9,6 +8,8 @@ import {
   JobStatus,
   User,
 } from '../../domain';
+import { CandidateFileRepository } from '../abstractions/files';
+import { ApplicationNotifier } from '../abstractions/notifications';
 import {
   JobApplicationRepository,
   JobRepository,
@@ -22,6 +23,7 @@ export class ApplicationService {
     private readonly applications: JobApplicationRepository,
     private readonly clock: Clock,
     private readonly notifier: ApplicationNotifier,
+    private readonly files: CandidateFileRepository,
   ) {}
 
   async apply(candidateId: number, jobId: number): Promise<JobApplication> {
@@ -51,6 +53,9 @@ export class ApplicationService {
       job.id,
       candidateId,
       this.clock.utcNow,
+      ApplicationStatus.Submitted,
+      // CV hiện tại được chụp lại lúc nộp: ứng viên đổi CV sau đó không ảnh hưởng đơn đã nộp.
+      (await this.files.getCurrent(candidateId))?.id ?? null,
     );
     await this.applications.add(application);
     await this.notifier.applicationReceived(job, application);

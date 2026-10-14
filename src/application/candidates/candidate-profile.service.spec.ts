@@ -1,4 +1,6 @@
 import { ArgumentError, Candidate, SalaryRange, Skill } from '../../domain';
+import { InMemoryCandidateFileRepository } from '../../infrastructure/persistence/in-memory-candidate-file-repository';
+import { InMemoryJobApplicationRepository } from '../../infrastructure/persistence/in-memory-job-application-repository';
 import { InMemoryCandidateRepository } from '../../infrastructure/persistence/in-memory-candidate-repository';
 import { ResourceNotFoundException } from '../exceptions';
 import { CandidateProfileService } from './candidate-profile.service';
@@ -15,7 +17,15 @@ describe('CandidateProfileService', () => {
     );
     candidate.addSkill(new Skill('Docker'));
     await repository.add(candidate);
-    return { repository, service: new CandidateProfileService(repository) };
+    return {
+      repository,
+      service: new CandidateProfileService(
+        repository,
+        new InMemoryCandidateFileRepository(
+          new InMemoryJobApplicationRepository(),
+        ),
+      ),
+    };
   }
 
   it('trả hồ sơ với kỹ năng sắp xếp không phân biệt hoa thường', async () => {
@@ -30,6 +40,7 @@ describe('CandidateProfileService', () => {
       desiredSalaryMin: 1000,
       desiredSalaryMax: 2000,
       skills: ['azure', 'Docker'],
+      cv: null,
     });
   });
 

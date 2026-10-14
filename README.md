@@ -65,6 +65,7 @@ npm run lint
 | `PERSISTENCE_PROVIDER` | `InMemory` | `InMemory` hoặc `PostgreSql` |
 | `DATABASE_URL` | URL dev ở cổng 5434 | Bắt buộc khi `NODE_ENV=production` và dùng PostgreSql |
 | `PERSISTENCE_APPLY_MIGRATIONS` | `false` | `true`: áp migration và nạp dữ liệu mẫu cho bảng còn trống khi khởi động |
+| `STORAGE_DIR` | `./storage` | Thư mục lưu tệp CV khi dùng PostgreSql (InMemory giữ tệp trong bộ nhớ) |
 | `OPENAPI_ENABLED` | bật ngoài production | Phát `/api/docs` và `/api/openapi.json` |
 
 ## Tài khoản demo
@@ -93,6 +94,7 @@ Tất cả route nằm dưới tiền tố `/api`.
 - `GET /notifications` (`unreadOnly`, `page`, `pageSize`), `GET /notifications/unread-count`,
   `PATCH /notifications/:id/read`, `PATCH /notifications/read-all` (đã đăng nhập, chỉ dữ liệu của chính mình)
 - `GET|PUT /candidates/:id/profile`, `GET /candidates/:id/applications`, `GET /candidates/:id/job-matches?jobIds=1,2`, `GET /candidates/:id/recommended-jobs` (Candidate, chỉ của chính mình)
+- `POST|GET|DELETE /candidates/:id/cv` (tải/tải về/xóa CV), `GET /employers/:companyId/applications/:id/cv` (nhà tuyển dụng tải CV đính kèm đơn)
 - `GET /saved-jobs`, `GET /saved-jobs/ids?jobIds=1,2`, `PUT|DELETE /saved-jobs/:jobId` (Candidate, việc làm đã lưu)
 - `GET /admin/stats`, `GET /admin/jobs|companies|users|audit-logs`, `POST /admin/jobs/:id/takedown|reinstate`, `POST /admin/companies/:id/suspend|reactivate`, `POST /admin/users/:id/disable|enable` (Admin)
 - `GET|POST /employers/:companyId/jobs`, `GET|PUT /employers/:companyId/jobs/:jobId`, `POST .../jobs/:jobId/publish|close`, `GET /employers/:companyId/applications`, `GET /employers/:companyId/applications/:id`, `GET|PUT /employers/:companyId/company` (Employer, đúng công ty trong token)
@@ -162,6 +164,21 @@ Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`,
 - Tin đã lưu mà sau đó không còn công khai vẫn nằm trong danh sách với `availability` (`Open`, `Closed`, `Expired`,
   `Unavailable`); tin bị gỡ/công ty bị khóa trả `job: null` để không lộ nội dung. Luôn bỏ lưu được.
 - Migration `0006_saved_jobs`; xóa tin hoặc ứng viên xóa luôn các bản lưu liên quan (`ON DELETE CASCADE`).
+
+## CV của ứng viên
+
+- Ứng viên tải một CV hiện tại (`POST /candidates/:id/cv`, multipart `file`); tải bản mới thay bản cũ. Chỉ nhận PDF, DOC,
+  DOCX tối đa 5 MB. Loại tệp được nhận diện theo **nội dung** (chữ ký đầu tệp; DOCX phải là ZIP có `word/`), không tin
+  đuôi tệp hay Content-Type do client gửi; tên hiển thị được làm sạch (bỏ đường dẫn, ký tự điều khiển, đuôi theo nội
+  dung thật) và giữ nguyên tiếng Việt.
+- Nộp đơn **chụp lại CV hiện tại** vào đơn (`job_applications.cv_file_id`). Ứng viên đổi hoặc xóa CV sau đó không làm
+  đổi những gì nhà tuyển dụng đã nhận; tệp chỉ bị xóa hẳn khi không còn đơn nào tham chiếu.
+- Nhà tuyển dụng tải CV qua `GET /employers/:companyId/applications/:id/cv`: chỉ công ty sở hữu tin (đơn của công ty
+  khác hoặc đơn không có CV trả 404). Hồ sơ ứng viên nhìn từ nhà tuyển dụng không lộ CV hiện tại của ứng viên.
+- Tải về luôn là `attachment` kèm `X-Content-Type-Options: nosniff` và `Cache-Control: private, no-store`.
+- Nội dung tệp nằm ở kho tệp (`FileStorage`): thư mục cục bộ `STORAGE_DIR` với khóa UUID (không thể path traversal) khi
+  dùng PostgreSql, hoặc bộ nhớ khi dùng InMemory. Thông tin mô tả nằm ở bảng `candidate_files` (migration `0007`); index
+  unique từng phần bảo đảm mỗi ứng viên chỉ có một CV hiện tại ngay cả khi hai lần tải chạy song song. Chưa có quét virus.
 
 ## Cơ sở dữ liệu
 

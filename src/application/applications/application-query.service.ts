@@ -5,6 +5,7 @@ import {
   Job,
   JobApplication,
 } from '../../domain';
+import { CandidateFileRepository } from '../abstractions/files';
 import {
   CandidateRepository,
   JobApplicationRepository,
@@ -14,6 +15,7 @@ import {
   CandidateProfileDto,
   toCandidateProfileDto,
 } from '../candidates/candidate-profile.service';
+import { CvInfoDto, toCvInfo } from '../candidates/cv-info';
 import { ResourceNotFoundException } from '../exceptions';
 import { companyNameOf } from '../jobs/job-mapping';
 import { JobMatchService } from '../matching/job-match.service';
@@ -28,6 +30,8 @@ export interface ApplicationDto {
   location: string;
   status: ApplicationStatus;
   appliedAt: Date;
+  /** Đã đính kèm CV lúc nộp đơn. */
+  cvAttached: boolean;
 }
 
 /** Đơn ứng tuyển nhìn từ phía nhà tuyển dụng, kèm độ phù hợp của ứng viên (0–100). */
@@ -41,6 +45,8 @@ export interface ApplicantDetailDto {
   matchedSkills: string[];
   missingSkills: string[];
   salaryFit: boolean;
+  /** CV đính kèm đơn này (bản tại thời điểm nộp), không phải CV hiện tại của ứng viên. */
+  cv: CvInfoDto | null;
 }
 
 const unique = (ids: number[]) => [...new Set(ids)];
@@ -52,6 +58,7 @@ export class ApplicationQueryService {
     private readonly applications: JobApplicationRepository,
     private readonly candidates: CandidateRepository,
     private readonly matching: JobMatchService,
+    private readonly files: CandidateFileRepository,
   ) {}
 
   async getByCandidateId(candidateId: number): Promise<ApplicationDto[]> {
@@ -113,6 +120,9 @@ export class ApplicationQueryService {
     if (!candidate) throw notFound;
 
     const match = this.matching.breakdown(job, candidate);
+    const cv = application.cvFileId
+      ? await this.files.getById(application.cvFileId)
+      : null;
     return {
       application: {
         ...toApplicationDto(application, job, candidate),
@@ -122,6 +132,7 @@ export class ApplicationQueryService {
       matchedSkills: match.matchedSkills,
       missingSkills: match.missingSkills,
       salaryFit: match.salaryFit,
+      cv: cv ? toCvInfo(cv) : null,
     };
   }
 
@@ -150,6 +161,7 @@ function toApplicationDto(
     location: job.location,
     status: application.status,
     appliedAt: application.appliedAt,
+    cvAttached: application.cvFileId !== null,
   };
 }
 

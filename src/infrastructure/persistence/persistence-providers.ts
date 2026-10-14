@@ -3,6 +3,10 @@ import {
   AdminReader,
   AuditLogRepository,
 } from '../../application/abstractions/admin';
+import {
+  CandidateFileRepository,
+  FileStorage,
+} from '../../application/abstractions/files';
 import { NotificationRepository } from '../../application/abstractions/notifications';
 import { SavedJobRepository } from '../../application/abstractions/saved-jobs';
 import {
@@ -26,6 +30,7 @@ import { Database } from '../postgres/database';
 import { DatabaseInitializer } from '../postgres/database-initializer';
 import { PostgresAdminReader } from '../postgres/postgres-admin-reader';
 import { PostgresAuditLogRepository } from '../postgres/postgres-audit-log-repository';
+import { PostgresCandidateFileRepository } from '../postgres/postgres-candidate-file-repository';
 import { PostgresCandidateRepository } from '../postgres/postgres-candidate-repository';
 import { PostgresCompanyRepository } from '../postgres/postgres-company-repository';
 import { PostgresJobApplicationRepository } from '../postgres/postgres-job-application-repository';
@@ -36,8 +41,11 @@ import { PostgresRefreshTokenRepository } from '../postgres/postgres-refresh-tok
 import { PostgresSavedJobRepository } from '../postgres/postgres-saved-job-repository';
 import { PostgresUserAccountRepository } from '../postgres/postgres-user-account-repository';
 import { JOB_SEED_FILE } from '../seed/paths';
+import { InMemoryFileStorage } from '../storage/in-memory-file-storage';
+import { LocalFileStorage } from '../storage/local-file-storage';
 import { InMemoryAdminReader } from './in-memory-admin-reader';
 import { InMemoryAuditLogRepository } from './in-memory-audit-log-repository';
+import { InMemoryCandidateFileRepository } from './in-memory-candidate-file-repository';
 import { InMemoryCandidateRepository } from './in-memory-candidate-repository';
 import { InMemoryCompanyRepository } from './in-memory-company-repository';
 import { InMemoryJobApplicationRepository } from './in-memory-job-application-repository';
@@ -61,6 +69,13 @@ const accountAliases: Provider[] = [
 function inMemoryProviders(): Provider[] {
   return [
     { provide: SavedJobRepository, useClass: InMemorySavedJobRepository },
+    { provide: FileStorage, useClass: InMemoryFileStorage },
+    {
+      provide: CandidateFileRepository,
+      inject: [JobApplicationRepository],
+      useFactory: (applications: JobApplicationRepository) =>
+        new InMemoryCandidateFileRepository(applications),
+    },
     {
       provide: RefreshTokenRepository,
       useClass: InMemoryRefreshTokenRepository,
@@ -132,6 +147,15 @@ function postgresProviders(config: AppConfig): Provider[] {
       provide: SavedJobRepository,
       inject: [Database],
       useFactory: (db: Database) => new PostgresSavedJobRepository(db),
+    },
+    {
+      provide: FileStorage,
+      useFactory: () => new LocalFileStorage(config.storageDirectory),
+    },
+    {
+      provide: CandidateFileRepository,
+      inject: [Database],
+      useFactory: (db: Database) => new PostgresCandidateFileRepository(db),
     },
     {
       provide: Database,
