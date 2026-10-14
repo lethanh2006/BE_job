@@ -87,13 +87,27 @@ sẽ thu hồi toàn bộ phiên cùng họ token.
 Tất cả route nằm dưới tiền tố `/api`.
 
 - `GET /health`
-- `GET /jobs` (lọc `keyword`, `location`, `category`, `level`, `minimumSalary`, `skills` lặp lại, `page`, `pageSize`, `sort`), `GET /jobs/:id`
+- `GET /jobs` (lọc `keyword`, `location`, `category`, `level`, `minimumSalary`, `skills` lặp lại, `page`, `pageSize`, `sort`), `GET /jobs/:id` (bản nháp trả 404)
 - `POST /auth/login`, `POST /auth/register/candidate`, `POST /auth/refresh`, `POST /auth/logout`, `PUT /auth/password`, `GET /auth/me`
 - `POST /applications` (Candidate), `PATCH /applications/:id/status` (Employer)
-- `GET|PUT /candidates/:id/profile`, `GET /candidates/:id/applications` (Candidate, chỉ của chính mình)
-- `GET|POST /employers/:companyId/jobs`, `POST /employers/:companyId/jobs/:jobId/publish|close`, `GET /employers/:companyId/applications` (Employer, đúng công ty trong token)
+- `GET|PUT /candidates/:id/profile`, `GET /candidates/:id/applications`, `GET /candidates/:id/job-matches?jobIds=1,2`, `GET /candidates/:id/recommended-jobs` (Candidate, chỉ của chính mình)
+- `GET|POST /employers/:companyId/jobs`, `GET|PUT /employers/:companyId/jobs/:jobId`, `POST .../jobs/:jobId/publish|close`, `GET /employers/:companyId/applications`, `GET /employers/:companyId/applications/:id` (Employer, đúng công ty trong token)
 
 Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`, `instance`).
+
+## Tìm kiếm và độ phù hợp
+
+- **Tìm kiếm** đi qua `JobSearchReader` (phía đọc): lọc, sắp xếp và phân trang diễn ra ở nơi lưu trữ và chỉ
+  đọc các cột của thẻ việc làm. Từ khóa, địa điểm, lĩnh vực và kỹ năng so khớp **không phân biệt hoa thường và
+  dấu tiếng Việt** (`ha noi` khớp `Hà Nội`). Bản in-memory dùng `foldText`, bản PostgreSQL dùng hàm `vn_fold`
+  (`unaccent`), có test so khớp hai bản.
+- **Đo trước khi tối ưu** (50.000 tin, PostgreSQL 17, mỗi truy vấn lấy trang đầu 10 tin): tải toàn bộ tin rồi
+  lọc trong bộ nhớ mất ~9.700 ms/request. Chuyển sang SQL còn 50–240 ms; thêm cột chuẩn hóa `search_text` +
+  index trigram và `skills_folded` + GIN (migration `0002`) còn ~7 ms với từ khóa hiếm, ~12 ms khi lọc kỹ năng,
+  ~46 ms với từ khóa phổ biến (quét tuần tự, khớp 12% số dòng).
+- **Độ phù hợp** (`JobMatchService`) = 70% độ trùng kỹ năng + 30% khoảng lương giao nhau, được ghép bằng
+  `CompositeScorer` + `WeightedScorer`. Dùng cho danh sách ứng viên của nhà tuyển dụng, điểm từng tin của ứng
+  viên (`job-matches`) và gợi ý việc làm (`recommended-jobs`, chọn trong 100 tin đang tuyển mới nhất).
 
 ## Cơ sở dữ liệu
 
@@ -114,5 +128,7 @@ unique chống ứng tuyển trùng, index `(status, deadline)`, khóa ngoại).
 
 - Truy cập dữ liệu bằng `pg` + SQL tay thay cho EF Core; migration viết bằng TypeScript.
 - Email hồ sơ và email tài khoản được so khớp không phân biệt hoa thường (unique index trên `lower(email)`).
+- `GET /jobs/:id` không trả bản nháp (bản C# trả mọi tin, kể cả chưa đăng); thêm `status`, `expired` vào chi tiết tin.
+- Tìm kiếm không phân biệt dấu tiếng Việt và lọc/phân trang ở tầng lưu trữ thay vì tải toàn bộ tin.
 - Tên ứng viên trong danh sách đơn ứng tuyển lấy từ repository ứng viên thay vì bảng tên cố định.
 - Đổi email hồ sơ trùng ứng viên khác trả 409 (bản C# trả 500); vượt giới hạn số kỹ năng trả 400.

@@ -1,9 +1,10 @@
 import { Database } from './database';
 import { initialSchema } from './migrations/0001-initial-schema';
+import { jobSearch } from './migrations/0002-job-search';
 import type { Migration } from './migrations/migration';
 
 /** Danh sách migration theo thứ tự; chỉ thêm vào cuối, không sửa migration đã phát hành. */
-export const allMigrations: readonly Migration[] = [initialSchema];
+export const allMigrations: readonly Migration[] = [initialSchema, jobSearch];
 
 /** Khóa advisory để nhiều instance khởi động cùng lúc không áp migration song song. */
 const MIGRATION_LOCK_KEY = 7_426_001;

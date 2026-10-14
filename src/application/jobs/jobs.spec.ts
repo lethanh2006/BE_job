@@ -1,5 +1,6 @@
 import { JobLevel, JobManagementForbiddenException } from '../../domain';
 import { Company, Employer, Skill, JobStatus } from '../../domain';
+import { InMemoryJobSearchReader } from '../../infrastructure/persistence/in-memory-job-search-reader';
 import { InMemoryJobApplicationRepository } from '../../infrastructure/persistence/in-memory-job-application-repository';
 import {
   FakeJobRepository,
@@ -19,7 +20,7 @@ describe('JobSearchService', () => {
 
   beforeEach(() => {
     jobs = new FakeJobRepository();
-    service = new JobSearchService(jobs);
+    service = new JobSearchService(new InMemoryJobSearchReader(jobs));
   });
 
   it('lọc theo trạng thái, từ khóa, mức lương và kỹ năng', async () => {
@@ -121,6 +122,36 @@ describe('JobSearchService', () => {
     expect(result.items.map((job) => job.id)).toEqual([1]);
   });
 
+  it('tìm không phân biệt hoa thường và dấu tiếng Việt', async () => {
+    jobs.seed(
+      makeJob(clock, {
+        id: 1,
+        title: 'Kỹ sư Hạ tầng',
+        location: 'Đà Nẵng',
+        category: 'Thiết kế sản phẩm',
+        skills: ['Quản lý dự án'],
+      }),
+      makeJob(clock, { id: 2, title: 'Khác', location: 'Hà Nội' }),
+    );
+
+    const ids = async (query: object) =>
+      (await service.search(query)).items.map((job) => job.id);
+
+    expect(await ids({ keyword: 'ky su ha tang' })).toEqual([1]);
+    expect(await ids({ location: 'DA NANG' })).toEqual([1]);
+    expect(await ids({ category: 'thiet ke' })).toEqual([1]);
+    expect(await ids({ skills: ['QUAN LY DU AN'] })).toEqual([1]);
+    expect(await ids({ keyword: 'đà nẵng' })).toEqual([]); // từ khóa chỉ tìm tiêu đề/công ty/kỹ năng
+  });
+
+  it('bỏ ký tự điều khiển trong từ khóa để không khớp vắt ngang hai trường', async () => {
+    jobs.seed(makeJob(clock, { id: 1, title: 'Backend', companyId: 7 }));
+
+    expect(
+      (await service.search({ keyword: 'Backend\u001fCông ty 7' })).items,
+    ).toEqual([]);
+  });
+
   it.each([
     [0, 20],
     [1, 0],
@@ -148,6 +179,32 @@ describe('JobDetailService', () => {
       title: 'Dev',
       company: 'Công ty 30',
       skills: ['A', 'b'],
+    });
+  });
+
+  it('bản nháp không công khai; tin đã đóng vẫn xem được và có cờ trạng thái', async () => {
+    const jobs = new FakeJobRepository().seed(
+      makeJob(clock, { id: 1, publish: false }),
+      makeJob(clock, { id: 2 }),
+    );
+    jobs.seed(
+      (() => {
+        const closed = makeJob(clock, { id: 3 });
+        closed.close();
+        return closed;
+      })(),
+    );
+    const service = new JobDetailService(jobs);
+
+    await expect(service.getById(1)).rejects.toBeInstanceOf(
+      ResourceNotFoundException,
+    );
+    await expect(service.getById(2)).resolves.toMatchObject({
+      status: JobStatus.Published,
+      expired: false,
+    });
+    await expect(service.getById(3)).resolves.toMatchObject({
+      status: JobStatus.Closed,
     });
   });
 

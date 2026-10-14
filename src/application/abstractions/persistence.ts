@@ -1,4 +1,5 @@
-import { Candidate, Job, JobApplication } from '../../domain';
+import { Candidate, Job, JobApplication, JobLevel } from '../../domain';
+import { JobSortOrder, JobSummaryDto } from '../jobs/dto';
 
 export interface Repository<TEntity> {
   getById(id: number): Promise<TEntity | null>;
@@ -37,4 +38,35 @@ export abstract class JobApplicationRepository implements Repository<JobApplicat
   abstract countByJobIds(
     jobIds: readonly number[],
   ): Promise<Map<number, number>>;
+}
+
+/** Điều kiện tìm kiếm đã được chuẩn hóa (đã trim, kỹ năng không rỗng, trang hợp lệ). */
+export interface JobSearchCriteria {
+  keyword?: string;
+  location?: string;
+  category?: string;
+  level?: JobLevel;
+  minimumSalary?: number;
+  /**
+   * Tin phải có đủ tất cả kỹ năng này. Đã được `foldText` (không dấu, chữ thường); so khớp chính xác.
+   * Từ khóa, địa điểm, lĩnh vực cũng so khớp kiểu "chứa" không phân biệt hoa thường và dấu.
+   */
+  skills: string[];
+  sort: JobSortOrder;
+  page: number;
+  pageSize: number;
+}
+
+export interface JobSearchPage {
+  items: JobSummaryDto[];
+  /** Tổng số tin khớp điều kiện (không phụ thuộc phân trang). */
+  total: number;
+}
+
+/**
+ * Phía đọc (query side) cho tìm kiếm tin đang tuyển: lọc, sắp xếp và phân trang diễn ra ở
+ * nơi lưu trữ và chỉ trả các cột cần cho danh sách, không tải toàn bộ nội dung từng tin.
+ */
+export abstract class JobSearchReader {
+  abstract search(criteria: JobSearchCriteria): Promise<JobSearchPage>;
 }

@@ -10,6 +10,7 @@ import {
   CandidateRepository,
   JobApplicationRepository,
   JobRepository,
+  JobSearchReader,
 } from '../../application/abstractions/persistence';
 import { AppConfig } from '../../config/app-config';
 import { Clock } from '../../domain';
@@ -18,12 +19,14 @@ import { DatabaseInitializer } from '../postgres/database-initializer';
 import { PostgresCandidateRepository } from '../postgres/postgres-candidate-repository';
 import { PostgresJobApplicationRepository } from '../postgres/postgres-job-application-repository';
 import { PostgresJobRepository } from '../postgres/postgres-job-repository';
+import { PostgresJobSearchReader } from '../postgres/postgres-job-search-reader';
 import { PostgresRefreshTokenRepository } from '../postgres/postgres-refresh-token-repository';
 import { PostgresUserAccountRepository } from '../postgres/postgres-user-account-repository';
 import { JOB_SEED_FILE } from '../seed/paths';
 import { InMemoryCandidateRepository } from './in-memory-candidate-repository';
 import { InMemoryJobApplicationRepository } from './in-memory-job-application-repository';
 import { InMemoryJobRepository } from './in-memory-job-repository';
+import { InMemoryJobSearchReader } from './in-memory-job-search-reader';
 import { InMemoryRefreshTokenRepository } from './in-memory-refresh-token-repository';
 import { InMemoryUserAccountRepository } from './in-memory-user-account-repository';
 
@@ -47,6 +50,11 @@ function inMemoryProviders(): Provider[] {
       inject: [Clock],
       useFactory: (clock: Clock) =>
         new InMemoryJobRepository(JOB_SEED_FILE, clock),
+    },
+    {
+      provide: JobSearchReader,
+      inject: [JobRepository],
+      useFactory: (jobs: JobRepository) => new InMemoryJobSearchReader(jobs),
     },
     {
       provide: JobApplicationRepository,
@@ -77,6 +85,12 @@ function postgresProviders(config: AppConfig): Provider[] {
       inject: [Database, Clock],
       useFactory: (db: Database, clock: Clock) =>
         new PostgresJobRepository(db, clock),
+    },
+    {
+      provide: JobSearchReader,
+      inject: [Database, Clock],
+      useFactory: (db: Database, clock: Clock) =>
+        new PostgresJobSearchReader(db, clock),
     },
     {
       provide: CandidateRepository,

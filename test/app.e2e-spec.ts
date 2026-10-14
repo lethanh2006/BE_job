@@ -244,6 +244,63 @@ describe.each(backends)('JobBoard API (e2e) — $name', (backend) => {
         .expect(404);
     });
 
+    it('độ phù hợp với các tin: kỹ năng khớp/thiếu và khoảng lương', async () => {
+      // Hồ sơ hiện có (sau khi cập nhật ở test trên): TypeScript, NestJS; lương 1000-2000.
+      const res = await http()
+        .get('/api/candidates/20/job-matches?jobIds=2,9999&jobIds=1')
+        .set(bearer(token))
+        .expect(200);
+
+      const byJob = Object.fromEntries(
+        res.body.map((m: { jobId: number }) => [m.jobId, m]),
+      );
+      expect(Object.keys(byJob).sort()).toEqual(['1', '2']);
+      expect(byJob[2]).toMatchObject({
+        score: 53, // 1/3 kỹ năng * 70% + lương khớp * 30%
+        matchedSkills: ['TypeScript'],
+        missingSkills: ['React', 'Next.js'],
+        salaryFit: true,
+      });
+    });
+
+    it('job-matches từ chối tham số sai và hồ sơ của người khác', async () => {
+      await http()
+        .get('/api/candidates/20/job-matches')
+        .set(bearer(token))
+        .expect(400);
+      await http()
+        .get('/api/candidates/20/job-matches?jobIds=abc')
+        .set(bearer(token))
+        .expect(400);
+      await http()
+        .get('/api/candidates/21/job-matches?jobIds=1')
+        .set(bearer(token))
+        .expect(403);
+      await http().get('/api/candidates/20/job-matches?jobIds=1').expect(401);
+    });
+
+    it('gợi ý việc làm: bỏ tin đã ứng tuyển, xếp theo độ phù hợp, tối đa limit', async () => {
+      const res = await http()
+        .get('/api/candidates/20/recommended-jobs?limit=3')
+        .set(bearer(token))
+        .expect(200);
+
+      expect(res.body.length).toBeLessThanOrEqual(3);
+      const applied = [1, 2, 5, 6]; // seed + đơn đã nộp ở test trước
+      for (const job of res.body) {
+        expect(applied).not.toContain(job.id);
+        expect(job.matchScore).toBeGreaterThan(0);
+      }
+      const scores = res.body.map(
+        (job: { matchScore: number }) => job.matchScore,
+      );
+      expect(scores).toEqual([...scores].sort((a, b) => b - a));
+      await http()
+        .get('/api/candidates/20/recommended-jobs?limit=0')
+        .set(bearer(token))
+        .expect(400);
+    });
+
     it('employer không được nộp đơn', async () => {
       const employer = (await login('employer@jobboard.vn')).body.accessToken;
       await http()
@@ -420,6 +477,36 @@ describe.each(backends)('JobBoard API (e2e) — $name', (backend) => {
         .get('/api/employers/1/applications/2')
         .set(bearer(token))
         .expect(404);
+    });
+
+    it('bản nháp không xem được công khai cho tới khi đăng', async () => {
+      const created = await http()
+        .post('/api/employers/1/jobs')
+        .set(bearer(token))
+        .send({ ...newJob('2099-01-01T00:00:00Z'), title: 'Nháp bí mật' })
+        .expect(201);
+      const id = created.body.id;
+
+      await http().get(`/api/jobs/${id}`).expect(404);
+      await http()
+        .post(`/api/employers/1/jobs/${id}/publish`)
+        .set(bearer(token))
+        .expect(200);
+      const detail = await http().get(`/api/jobs/${id}`).expect(200);
+      expect(detail.body).toMatchObject({
+        title: 'Nháp bí mật',
+        status: 'Published',
+        expired: false,
+      });
+
+      await http()
+        .post(`/api/employers/1/jobs/${id}/close`)
+        .set(bearer(token))
+        .expect(200);
+      await http()
+        .get(`/api/jobs/${id}`)
+        .expect(200)
+        .then((r) => expect(r.body.status).toBe('Closed'));
     });
 
     it('hạn nộp trong quá khứ → 400', async () => {

@@ -12,6 +12,7 @@ import { PasswordChangeService } from './application/auth/password-change.servic
 import { RegistrationService } from './application/auth/registration.service';
 import { SessionService } from './application/auth/session.service';
 import { CandidateProfileService } from './application/candidates/candidate-profile.service';
+import { CandidateMatchService } from './application/matching/candidate-match.service';
 import { JobMatchService } from './application/matching/job-match.service';
 import { JobDetailService } from './application/jobs/job-detail.service';
 import { JobManagementService } from './application/jobs/job-management.service';
@@ -54,6 +55,7 @@ import { persistenceProviders } from './infrastructure/persistence/persistence-p
         ),
     },
     JobMatchService,
+    CandidateMatchService,
     JobSearchService,
     JobDetailService,
     JobManagementService,

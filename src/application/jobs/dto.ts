@@ -29,6 +29,10 @@ export interface JobDetailDto extends Omit<
   deadline: Date;
   featured: boolean;
   skills: string[];
+  /** Published (đang tuyển) hoặc Closed (đã đóng, chỉ còn để xem lại). */
+  status: JobStatus;
+  /** Đã quá hạn nộp hồ sơ. */
+  expired: boolean;
 }
 
 export interface EmployerJobDto {
@@ -95,4 +99,9 @@ export interface SearchJobsQuery {
   category?: string | null;
   level?: JobLevel | null;
   sort?: JobSortOrder;
+}
+
+export interface RecommendedJobDto extends JobSummaryDto {
+  /** Độ phù hợp 0–100 với hồ sơ của ứng viên. */
+  matchScore: number;
 }

@@ -1,6 +1,8 @@
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -8,6 +10,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { JobSummaryResponseDto } from './jobs.dto';
 
 export class UpdateCandidateProfileDto {
   @IsString() @MaxLength(320) email!: string;
@@ -33,4 +36,46 @@ export class CandidateProfileResponseDto {
   desiredSalaryMin!: number | null;
   desiredSalaryMax!: number | null;
   skills!: string[];
+}
+
+/** Nhận `jobIds=1,2,3` hoặc lặp lại tham số `jobIds=1&jobIds=2`. */
+const toIntegerList = ({ value }: { value: unknown }): unknown => {
+  if (value === undefined) return undefined;
+  const parts = (Array.isArray(value) ? value : [value]).flatMap((item) =>
+    String(item).split(','),
+  );
+  return parts.filter((part) => part.trim() !== '').map(Number);
+};
+
+export class JobMatchesQueryDto {
+  /** Mã các tin cần chấm điểm (tối đa 50). */
+  @Transform(toIntegerList)
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  jobIds!: number[];
+}
+
+export class RecommendedJobsQueryDto {
+  /** Số tin tối đa trả về (1–20, mặc định 6). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  limit?: number = 6;
+}
+
+export class JobMatchResponseDto {
+  jobId!: number;
+  /** Độ phù hợp 0–100 (70% kỹ năng, 30% mức lương). */
+  score!: number;
+  matchedSkills!: string[];
+  missingSkills!: string[];
+  salaryFit!: boolean;
+}
+
+export class RecommendedJobResponseDto extends JobSummaryResponseDto {
+  matchScore!: number;
 }

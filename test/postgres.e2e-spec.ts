@@ -1,5 +1,10 @@
 import {
   AlreadyAppliedException,
+  Company,
+  Job,
+  JobLevel,
+  JobStatus,
+  WorkMode,
   ApplicationStatus,
   Candidate,
   JobApplication,
@@ -7,7 +12,13 @@ import {
   Skill,
   SystemClock,
 } from '../src/domain';
+import { JobSearchCriteria } from '../src/application/abstractions/persistence';
+import { JobSortOrder } from '../src/application/jobs/dto';
 import { EmailAlreadyExistsException } from '../src/application/exceptions';
+import { InMemoryJobSearchReader } from '../src/infrastructure/persistence/in-memory-job-search-reader';
+import { PostgresJobSearchReader } from '../src/infrastructure/postgres/postgres-job-search-reader';
+import { FakeJobRepository } from '../src/testing/test-helpers';
+import { foldText } from '../src/application/common/text-folding';
 import { AccountRole, RefreshTokenSession } from '../src/application/auth';
 import { Pbkdf2PasswordHasher } from '../src/infrastructure/auth/pbkdf2-password-hasher';
 import { SecureRefreshTokenGenerator } from '../src/infrastructure/auth/secure-refresh-token-generator';
@@ -280,5 +291,228 @@ describeWithPostgres('Tầng lưu trữ PostgreSQL', () => {
       [issued.session.familyId],
     );
     expect(rows.rows).toHaveLength(0);
+  });
+});
+
+describeWithPostgres('Tìm kiếm tin: PostgreSQL khớp bản in-memory', () => {
+  let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
+  let db: Database;
+  const clock = new SystemClock();
+  const day = 86_400_000;
+
+  const baseCriteria: JobSearchCriteria = {
+    skills: [],
+    sort: JobSortOrder.Newest,
+    page: 1,
+    pageSize: 50,
+  };
+
+  beforeAll(async () => {
+    testDatabase = await createTestDatabase(E2E_POSTGRES_URL!);
+    db = Database.connect(testDatabase.url, 5);
+    await new DatabaseInitializer(
+      db,
+      clock,
+      hasher(),
+      JOB_SEED_FILE,
+    ).initialize();
+
+    const jobs = new PostgresJobRepository(db, clock);
+    const make = async (
+      overrides: Partial<{
+        title: string;
+        companyName: string;
+        location: string;
+        category: string;
+        level: JobLevel;
+        salary: [number, number];
+        skills: string[];
+        postedDaysAgo: number;
+        deadlineDays: number;
+        status: JobStatus;
+      }> = {},
+    ) => {
+      const id = await jobs.getNextId();
+      const now = clock.utcNow.getTime();
+      const props = {
+        id,
+        title: overrides.title ?? `Công việc ${id}`,
+        companyId: 90 + (id % 3),
+        company: new Company(
+          90 + (id % 3),
+          overrides.companyName ?? 'Công ty thử',
+        ),
+        salary: new SalaryRange(...(overrides.salary ?? [1000, 2000])),
+        deadline: new Date(now + (overrides.deadlineDays ?? 20) * day),
+        clock,
+        location: overrides.location ?? 'Hà Nội',
+        level: overrides.level ?? JobLevel.Middle,
+        workMode: WorkMode.Hybrid,
+        category: overrides.category ?? 'Lập trình Backend',
+        postedAt: new Date(now - (overrides.postedDaysAgo ?? 1) * day),
+        status: overrides.status ?? JobStatus.Published,
+      };
+      const job = Job.restore(props);
+      (overrides.skills ?? []).forEach((skill) =>
+        job.addSkill(new Skill(skill)),
+      );
+      await jobs.add(job);
+    };
+
+    await make({
+      title: 'Giảm giá 100% cho nhân viên',
+      skills: ['Excel'],
+      postedDaysAgo: 2,
+    });
+    await make({
+      title: 'Dev a_b tool',
+      skills: ['Go'],
+      postedDaysAgo: 3,
+      salary: [3000, 6000],
+    });
+    await make({
+      title: 'NESTJS Engineer',
+      companyName: 'Zeta Labs',
+      skills: ['NestJS', 'TypeScript', 'Docker'],
+      level: JobLevel.Senior,
+      salary: [2500, 4000],
+      postedDaysAgo: 4,
+    });
+    await make({
+      title: 'Kỹ sư Hạ tầng',
+      location: 'Đà Nẵng',
+      category: 'DevOps & Cloud',
+      skills: ['kubernetes', 'AWS'],
+      level: JobLevel.Lead,
+      salary: [4000, 4000],
+      postedDaysAgo: 5,
+    });
+    await make({
+      title: 'Designer',
+      location: 'TP. Hồ Chí Minh',
+      category: 'Thiết kế sản phẩm',
+      skills: ['Figma'],
+      level: JobLevel.Junior,
+      salary: [500, 900],
+      postedDaysAgo: 6,
+    });
+    await make({
+      title: 'Bản nháp không hiển thị',
+      status: JobStatus.Draft,
+      skills: ['Go'],
+    });
+    await make({
+      title: 'Đã đóng không hiển thị',
+      status: JobStatus.Closed,
+      skills: ['Go'],
+    });
+    await make({
+      title: 'Quá hạn không hiển thị',
+      deadlineDays: -2,
+      skills: ['Go'],
+    });
+    // Cùng ngày đăng và cùng lương: thứ tự phải ổn định theo id.
+    await make({
+      title: 'Trùng thời điểm A',
+      postedDaysAgo: 7,
+      salary: [1000, 2000],
+    });
+    await make({
+      title: 'Trùng thời điểm B',
+      postedDaysAgo: 7,
+      salary: [1000, 2000],
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    await db.close();
+    await testDatabase.drop();
+  });
+
+  const hasher = () => new Pbkdf2PasswordHasher();
+
+  const cases: [string, Partial<JobSearchCriteria>][] = [
+    ['không điều kiện', {}],
+    [
+      'từ khóa theo tên công ty (không phân biệt hoa thường)',
+      { keyword: 'zeta' },
+    ],
+    ['từ khóa theo tiêu đề', { keyword: 'nestjs' }],
+    ['từ khóa theo kỹ năng (chứa)', { keyword: 'kuber' }],
+    ['từ khóa có dấu %', { keyword: '100%' }],
+    ['từ khóa có dấu _ (không phải ký tự đại diện)', { keyword: 'a_b' }],
+    ['từ khóa có dấu gạch chéo ngược', { keyword: 'a\\b' }],
+    ['từ khóa không khớp', { keyword: 'khong-ton-tai' }],
+    ['địa điểm có dấu', { location: 'đà nẵng' }],
+    ['địa điểm viết hoa', { location: 'HÀ NỘI' }],
+    ['địa điểm không dấu', { location: 'ha noi' }],
+    ['địa điểm không dấu (đ)', { location: 'da nang' }],
+    ['từ khóa không dấu theo tiêu đề', { keyword: 'ky su ha tang' }],
+    ['từ khóa có dấu khớp tiêu đề có dấu', { keyword: 'KỸ SƯ' }],
+    ['lĩnh vực không dấu', { category: 'thiet ke' }],
+    ['kỹ năng không dấu', { skills: ['kubernetes'] }],
+    ['lĩnh vực chứa chuỗi', { category: 'backend' }],
+    ['cấp bậc', { level: JobLevel.Senior }],
+    ['lương tối thiểu', { minimumSalary: 2500 }],
+    ['một kỹ năng (không phân biệt hoa thường)', { skills: ['kubernetes'] }],
+    ['nhiều kỹ năng phải có đủ', { skills: ['nestjs', 'docker'] }],
+    ['kỹ năng không đủ', { skills: ['nestjs', 'figma'] }],
+    [
+      'kết hợp nhiều điều kiện',
+      {
+        keyword: 'engineer',
+        level: JobLevel.Senior,
+        minimumSalary: 2000,
+        skills: ['typescript'],
+      },
+    ],
+    ['sắp xếp lương giảm dần', { sort: JobSortOrder.SalaryDescending }],
+    ['phân trang trang 2', { page: 2, pageSize: 3 }],
+    ['phân trang trang cuối lẻ', { page: 3, pageSize: 4 }],
+    ['trang vượt quá dữ liệu vẫn có tổng', { page: 99, pageSize: 5 }],
+  ];
+
+  it.each(cases)('%s', async (_name, overrides) => {
+    const criteria = { ...baseCriteria, ...overrides };
+    const entities = await new PostgresJobRepository(db, clock).getAll();
+    const expected = await new InMemoryJobSearchReader(
+      new FakeJobRepository().seed(...entities),
+    ).search(criteria);
+
+    const actual = await new PostgresJobSearchReader(db, clock).search(
+      criteria,
+    );
+
+    expect(actual.total).toBe(expected.total);
+    expect(actual.items).toEqual(expected.items);
+  });
+
+  it('foldText (JS) và vn_fold (SQL) cho cùng kết quả', async () => {
+    const samples = [
+      'Hà Nội',
+      'ĐÀ NẴNG',
+      'đường Nguyễn Thị Minh Khai',
+      'Thiết kế sản phẩm',
+      'Lập trình Backend',
+      'Phượng ơ ư ằ ẳ ẵ ặ',
+      'CI/CD & DevOps',
+      'C# / .NET',
+    ];
+    for (const sample of samples) {
+      const { rows } = await db.query<{ folded: string }>(
+        'SELECT vn_fold($1) AS folded',
+        [sample],
+      );
+      expect(rows[0].folded).toBe(foldText(sample));
+    }
+  });
+
+  it('chỉ trả tin Published còn hạn', async () => {
+    const { items } = await new PostgresJobSearchReader(db, clock).search(
+      baseCriteria,
+    );
+
+    expect(items.some((job) => /không hiển thị/.test(job.title))).toBe(false);
+    expect(items.length).toBeGreaterThan(5);
   });
 });

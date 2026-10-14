@@ -105,6 +105,10 @@ export class JobDetailResponseDto extends JobSummaryResponseDto {
   description!: string[];
   requirements!: string[];
   benefits!: string[];
+  /** Published (đang tuyển) hoặc Closed (đã đóng, chỉ còn để xem lại). */
+  status!: JobStatus;
+  /** Đã quá hạn nộp hồ sơ. */
+  expired!: boolean;
 }
 
 export class PagedJobsResponseDto {
