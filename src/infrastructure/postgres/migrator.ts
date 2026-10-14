@@ -4,6 +4,7 @@ import { jobSearch } from './migrations/0002-job-search';
 import { companies } from './migrations/0003-companies';
 import { moderation } from './migrations/0004-moderation';
 import { notifications } from './migrations/0005-notifications';
+import { savedJobs } from './migrations/0006-saved-jobs';
 import type { Migration } from './migrations/migration';
 
 /** Danh sách migration theo thứ tự; chỉ thêm vào cuối, không sửa migration đã phát hành. */
@@ -13,6 +14,7 @@ export const allMigrations: readonly Migration[] = [
   companies,
   moderation,
   notifications,
+  savedJobs,
 ];
 
 /** Khóa advisory để nhiều instance khởi động cùng lúc không áp migration song song. */

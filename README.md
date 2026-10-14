@@ -93,6 +93,7 @@ Tất cả route nằm dưới tiền tố `/api`.
 - `GET /notifications` (`unreadOnly`, `page`, `pageSize`), `GET /notifications/unread-count`,
   `PATCH /notifications/:id/read`, `PATCH /notifications/read-all` (đã đăng nhập, chỉ dữ liệu của chính mình)
 - `GET|PUT /candidates/:id/profile`, `GET /candidates/:id/applications`, `GET /candidates/:id/job-matches?jobIds=1,2`, `GET /candidates/:id/recommended-jobs` (Candidate, chỉ của chính mình)
+- `GET /saved-jobs`, `GET /saved-jobs/ids?jobIds=1,2`, `PUT|DELETE /saved-jobs/:jobId` (Candidate, việc làm đã lưu)
 - `GET /admin/stats`, `GET /admin/jobs|companies|users|audit-logs`, `POST /admin/jobs/:id/takedown|reinstate`, `POST /admin/companies/:id/suspend|reactivate`, `POST /admin/users/:id/disable|enable` (Admin)
 - `GET|POST /employers/:companyId/jobs`, `GET|PUT /employers/:companyId/jobs/:jobId`, `POST .../jobs/:jobId/publish|close`, `GET /employers/:companyId/applications`, `GET /employers/:companyId/applications/:id`, `GET|PUT /employers/:companyId/company` (Employer, đúng công ty trong token)
 
@@ -149,6 +150,18 @@ Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`,
 - `test/notifications.e2e-spec.ts` chạy cùng kịch bản trên hai provider: phát theo
   nghiệp vụ, phân quyền, chống gửi lại tuần tự, phân trang, lọc và đánh dấu đã đọc.
   Unit test kiểm tra giới hạn người nhận và lỗi thông báo không làm hỏng nghiệp vụ.
+
+## Việc làm đã lưu
+
+- Ứng viên lưu/bỏ lưu tin (`PUT|DELETE /saved-jobs/:jobId`), xem danh sách mới nhất trước và kiểm tra hàng loạt
+  tin nào đã lưu (`GET /saved-jobs/ids`, một truy vấn cho cả trang kết quả thay vì gọi từng thẻ). Danh tính lấy từ JWT.
+- Lưu lặp lại là idempotent: khóa chính `(candidate_id, job_id)` + `ON CONFLICT DO NOTHING` nên gọi song song không
+  tạo bản sao và không đổi thời điểm lưu. Lưu tin không tạo đơn ứng tuyển.
+- Chỉ lưu mới được tin đang đăng còn hạn. Tin đã đóng hoặc hết hạn trả 400 (cùng quy tắc với ứng tuyển); bản nháp, tin
+  bị gỡ và tin của công ty bị khóa coi như không tồn tại (404).
+- Tin đã lưu mà sau đó không còn công khai vẫn nằm trong danh sách với `availability` (`Open`, `Closed`, `Expired`,
+  `Unavailable`); tin bị gỡ/công ty bị khóa trả `job: null` để không lộ nội dung. Luôn bỏ lưu được.
+- Migration `0006_saved_jobs`; xóa tin hoặc ứng viên xóa luôn các bản lưu liên quan (`ON DELETE CASCADE`).
 
 ## Cơ sở dữ liệu
 

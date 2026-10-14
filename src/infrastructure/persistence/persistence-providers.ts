@@ -4,6 +4,7 @@ import {
   AuditLogRepository,
 } from '../../application/abstractions/admin';
 import { NotificationRepository } from '../../application/abstractions/notifications';
+import { SavedJobRepository } from '../../application/abstractions/saved-jobs';
 import {
   AccountRegistrationRepository,
   AccountSecurityRepository,
@@ -32,6 +33,7 @@ import { PostgresJobRepository } from '../postgres/postgres-job-repository';
 import { PostgresJobSearchReader } from '../postgres/postgres-job-search-reader';
 import { PostgresNotificationRepository } from '../postgres/postgres-notification-repository';
 import { PostgresRefreshTokenRepository } from '../postgres/postgres-refresh-token-repository';
+import { PostgresSavedJobRepository } from '../postgres/postgres-saved-job-repository';
 import { PostgresUserAccountRepository } from '../postgres/postgres-user-account-repository';
 import { JOB_SEED_FILE } from '../seed/paths';
 import { InMemoryAdminReader } from './in-memory-admin-reader';
@@ -43,6 +45,7 @@ import { InMemoryJobRepository } from './in-memory-job-repository';
 import { InMemoryJobSearchReader } from './in-memory-job-search-reader';
 import { InMemoryNotificationRepository } from './in-memory-notification-repository';
 import { InMemoryRefreshTokenRepository } from './in-memory-refresh-token-repository';
+import { InMemorySavedJobRepository } from './in-memory-saved-job-repository';
 import { InMemoryUserAccountRepository } from './in-memory-user-account-repository';
 
 /** Một repository tài khoản dùng chung cho 3 abstraction (đọc / đăng ký / bảo mật). */
@@ -57,6 +60,7 @@ const accountAliases: Provider[] = [
 
 function inMemoryProviders(): Provider[] {
   return [
+    { provide: SavedJobRepository, useClass: InMemorySavedJobRepository },
     {
       provide: RefreshTokenRepository,
       useClass: InMemoryRefreshTokenRepository,
@@ -124,6 +128,11 @@ function inMemoryProviders(): Provider[] {
 
 function postgresProviders(config: AppConfig): Provider[] {
   const providers: Provider[] = [
+    {
+      provide: SavedJobRepository,
+      inject: [Database],
+      useFactory: (db: Database) => new PostgresSavedJobRepository(db),
+    },
     {
       provide: Database,
       useFactory: () => Database.connect(config.persistence.databaseUrl!),

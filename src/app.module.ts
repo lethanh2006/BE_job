@@ -1,6 +1,3 @@
-import { ApplicationNotifier } from './application/abstractions/notifications';
-import { NotificationService } from './application/notifications/notification.service';
-import { NotificationsController } from './api/controllers/notifications.controller';
 import { DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import {
@@ -8,6 +5,7 @@ import {
   PasswordHasher,
   RefreshTokenGenerator,
 } from './application/abstractions/authentication';
+import { ApplicationNotifier } from './application/abstractions/notifications';
 import { ApplicationQueryService } from './application/applications/application-query.service';
 import { ApplicationService } from './application/applications/application.service';
 import { LoginService } from './application/auth/login.service';
@@ -18,11 +16,13 @@ import { AdminModerationService } from './application/admin/admin-moderation.ser
 import { AdminQueryService } from './application/admin/admin-query.service';
 import { CompanyService } from './application/companies/company.service';
 import { CandidateProfileService } from './application/candidates/candidate-profile.service';
+import { SavedJobService } from './application/candidates/saved-job.service';
 import { CandidateMatchService } from './application/matching/candidate-match.service';
 import { JobMatchService } from './application/matching/job-match.service';
 import { JobDetailService } from './application/jobs/job-detail.service';
 import { JobManagementService } from './application/jobs/job-management.service';
 import { JobSearchService } from './application/jobs/job-search.service';
+import { NotificationService } from './application/notifications/notification.service';
 import { JwtAuthGuard, RolesGuard } from './api/auth/auth';
 import { AdminController } from './api/controllers/admin.controller';
 import { ApplicationsController } from './api/controllers/applications.controller';
@@ -32,6 +32,8 @@ import { CandidatesController } from './api/controllers/candidates.controller';
 import { EmployersController } from './api/controllers/employers.controller';
 import { HealthController } from './api/controllers/health.controller';
 import { JobsController } from './api/controllers/jobs.controller';
+import { NotificationsController } from './api/controllers/notifications.controller';
+import { SavedJobsController } from './api/controllers/saved-jobs.controller';
 import { ProblemDetailsFilter } from './api/errors/problem-details.filter';
 import { AppConfig } from './config/app-config';
 import { Clock, SystemClock } from './domain';
@@ -42,6 +44,7 @@ import { persistenceProviders } from './infrastructure/persistence/persistence-p
 
 @Module({
   controllers: [
+    SavedJobsController,
     NotificationsController,
     HealthController,
     JobsController,
@@ -53,6 +56,7 @@ import { persistenceProviders } from './infrastructure/persistence/persistence-p
     EmployersController,
   ],
   providers: [
+    SavedJobService,
     { provide: Clock, useClass: SystemClock },
     { provide: PasswordHasher, useClass: Pbkdf2PasswordHasher },
     { provide: AccessTokenGenerator, useClass: JwtAccessTokenGenerator },
