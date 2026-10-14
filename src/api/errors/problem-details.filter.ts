@@ -13,6 +13,7 @@ import {
   DomainException,
   JobManagementForbiddenException,
 } from '../../domain';
+import { requestIdOf } from '../http/security';
 import {
   AccountDisabledException,
   CompanyNameAlreadyExistsException,
@@ -43,10 +44,11 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     const request = http.getRequest<Request>();
     const response = http.getResponse<Response>();
     const problem = this.toProblem(exception);
+    const requestId = requestIdOf(response);
 
     if (problem.status === Number(HttpStatus.INTERNAL_SERVER_ERROR)) {
       this.logger.error(
-        `Lỗi không được xử lý khi gọi ${request.method} ${request.path}`,
+        `Lỗi không được xử lý khi gọi ${request.method} ${request.path} (mã yêu cầu ${requestId ?? 'không có'})`,
         exception instanceof Error ? exception.stack : String(exception),
       );
     }
@@ -59,7 +61,11 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     response
       .status(problem.status)
       .type('application/problem+json')
-      .json({ ...body, instance: request.path });
+      .json({
+        ...body,
+        instance: request.path,
+        ...(requestId ? { requestId } : {}),
+      });
   }
 
   private toProblem(exception: unknown): Problem {
@@ -146,6 +152,13 @@ export class ProblemDetailsFilter implements ExceptionFilter {
           status,
           title: 'Tệp quá lớn',
           detail: 'Tệp tải lên vượt quá dung lượng cho phép (5 MB).',
+        };
+      case Number(HttpStatus.SERVICE_UNAVAILABLE):
+        return {
+          status,
+          title: 'Dịch vụ chưa sẵn sàng',
+          detail:
+            'Hệ thống chưa kết nối được tới cơ sở dữ liệu. Vui lòng thử lại sau.',
         };
       case Number(HttpStatus.NOT_FOUND):
         return {

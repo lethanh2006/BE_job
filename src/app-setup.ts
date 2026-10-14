@@ -6,6 +6,7 @@ import {
 import type { Express } from 'express';
 import { AppConfig } from './config/app-config';
 import { ArgumentError } from './domain';
+import { applySecurity } from './api/http/security';
 
 const flattenMessages = (errors: ValidationError[]): string[] =>
   errors.flatMap((error) => [
@@ -20,6 +21,7 @@ export function configureApp(app: INestApplication, config: AppConfig): void {
     'trust proxy',
     config.security.trustProxy,
   );
+  applySecurity(app);
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
     new ValidationPipe({

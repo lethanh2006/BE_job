@@ -3,6 +3,7 @@ import {
   AdminReader,
   AuditLogRepository,
 } from '../../application/abstractions/admin';
+import { ReadinessProbe } from '../../application/abstractions/health';
 import {
   CandidateFileRepository,
   FileStorage,
@@ -27,6 +28,8 @@ import {
 } from '../../application/abstractions/persistence';
 import { AppConfig } from '../../config/app-config';
 import { Clock } from '../../domain';
+import { AlwaysReadyProbe } from '../health/always-ready-probe';
+import { PostgresReadinessProbe } from '../health/postgres-readiness-probe';
 import { Database } from '../postgres/database';
 import { DatabaseInitializer } from '../postgres/database-initializer';
 import { PostgresAdminReader } from '../postgres/postgres-admin-reader';
@@ -71,6 +74,7 @@ const accountAliases: Provider[] = [
 
 function inMemoryProviders(): Provider[] {
   return [
+    { provide: ReadinessProbe, useClass: AlwaysReadyProbe },
     { provide: SavedJobRepository, useClass: InMemorySavedJobRepository },
     { provide: FileStorage, useClass: InMemoryFileStorage },
     {
@@ -169,6 +173,11 @@ function postgresProviders(config: AppConfig): Provider[] {
     {
       provide: Database,
       useFactory: () => Database.connect(config.persistence.databaseUrl!),
+    },
+    {
+      provide: ReadinessProbe,
+      inject: [Database],
+      useFactory: (db: Database) => new PostgresReadinessProbe(db),
     },
     {
       provide: JobRepository,

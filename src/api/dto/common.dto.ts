@@ -8,6 +8,8 @@ export class ProblemDetailsDto {
   detail!: string;
   /** Đường dẫn của request gây lỗi. */
   instance!: string;
+  /** Mã truy vết, trùng header X-Request-Id; cung cấp khi báo lỗi để tra log. */
+  requestId?: string;
 }
 
 export class HealthResponseDto {

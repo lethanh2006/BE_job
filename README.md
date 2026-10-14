@@ -96,7 +96,7 @@ sẽ thu hồi toàn bộ phiên cùng họ token.
 
 Tất cả route nằm dưới tiền tố `/api`.
 
-- `GET /health`
+- `GET /health` (liveness, không chạm cơ sở dữ liệu), `GET /health/ready` (readiness: 503 khi chưa kết nối được cơ sở dữ liệu)
 - `GET /jobs` (lọc `keyword`, `location`, `category`, `level`, `minimumSalary`, `skills` lặp lại, `page`, `pageSize`, `sort`), `GET /jobs/categories`, `GET /jobs/:id` (bản nháp trả 404), `GET /companies/:id` (hồ sơ công khai; tin của công ty: `GET /jobs?companyId=`)
 - `POST /auth/login`, `POST /auth/register/candidate`, `POST /auth/register/employer` (tạo công ty + tài khoản quản lý), `POST /auth/refresh`, `POST /auth/logout`, `PUT /auth/password`, `POST /auth/forgot-password`, `POST /auth/reset-password`, `GET /auth/me`
 - `POST /applications` (Candidate), `PATCH /applications/:id/status` (Employer)
@@ -188,6 +188,17 @@ Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`,
 - Nội dung tệp nằm ở kho tệp (`FileStorage`): thư mục cục bộ `STORAGE_DIR` với khóa UUID (không thể path traversal) khi
   dùng PostgreSql, hoặc bộ nhớ khi dùng InMemory. Thông tin mô tả nằm ở bảng `candidate_files` (migration `0007`); index
   unique từng phần bảo đảm mỗi ứng viên chỉ có một CV hiện tại ngay cả khi hai lần tải chạy song song. Chưa có quét virus.
+
+## Bảo mật HTTP và truy vết
+
+- Mọi phản hồi (kể cả lỗi) mang header bảo mật của `helmet` (`X-Content-Type-Options: nosniff`, `X-Frame-Options`,
+  `Referrer-Policy: no-referrer`, HSTS, CSP...) và không lộ `X-Powered-By`. Swagger UI vẫn chạy dưới CSP mặc định.
+- Phản hồi dưới `/api/auth/*` (có token) luôn là `Cache-Control: no-store`.
+- Mỗi request có `X-Request-Id`: nhận lại mã client gửi nếu có dạng an toàn (`A-Za-z0-9._-`, 8–64 ký tự), nếu không thì sinh
+  UUID mới. Mã này nằm trong log lỗi hệ thống và trường `requestId` của mọi ProblemDetails để tra cứu khi người dùng báo lỗi.
+- `GET /health` chỉ báo tiến trình còn sống; `GET /health/ready` chạy `SELECT 1` (giới hạn 2 giây) và trả 503 ProblemDetails
+  không lộ chi tiết nội bộ khi cơ sở dữ liệu lỗi, dùng làm readiness probe. Pool kết nối PostgreSQL có thời gian chờ lấy
+  kết nối 10 giây để request không treo vô hạn khi cơ sở dữ liệu không phản hồi.
 
 ## Giới hạn tần suất
 

@@ -19,7 +19,14 @@ export class Database implements Queryable, OnApplicationShutdown {
   private constructor(private readonly pool: Pool) {}
 
   static connect(connectionString: string, maxConnections = 10): Database {
-    return new Database(new Pool({ connectionString, max: maxConnections }));
+    return new Database(
+      new Pool({
+        connectionString,
+        max: maxConnections,
+        // Cơ sở dữ liệu không phản hồi thì request phải lỗi sau một lúc, không treo vô hạn.
+        connectionTimeoutMillis: 10_000,
+      }),
+    );
   }
 
   async query<T extends QueryResultRow = QueryResultRow>(
