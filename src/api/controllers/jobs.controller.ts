@@ -11,6 +11,7 @@ import { JobDetailService } from '../../application/jobs/job-detail.service';
 import { JobSearchService } from '../../application/jobs/job-search.service';
 import { ApiProblems } from '../dto/api-responses';
 import {
+  JobCategoryResponseDto,
   JobDetailResponseDto,
   PagedJobsResponseDto,
   SearchJobsQueryDto,
@@ -34,6 +35,16 @@ export class JobsController {
   @ApiProblems(HttpStatus.BAD_REQUEST)
   search(@Query() query: SearchJobsQueryDto) {
     return this.searchService.search(query);
+  }
+
+  @Get('categories')
+  @ApiOperation({
+    summary: 'Các lĩnh vực đang tuyển kèm số tin',
+    description: 'Nhiều tin nhất trước; dùng cho bộ lọc và trang chủ.',
+  })
+  @ApiOkResponse({ type: [JobCategoryResponseDto] })
+  categories() {
+    return this.searchService.categories();
   }
 
   @Get(':id')

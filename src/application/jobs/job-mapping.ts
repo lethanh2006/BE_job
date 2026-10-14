@@ -1,4 +1,5 @@
 import { Job } from '../../domain';
+import { JobCategoryCount } from '../abstractions/persistence';
 import { JobSummaryDto } from './dto';
 
 export const companyNameOf = (job: Job): string =>
@@ -27,3 +28,11 @@ export const toJobSummary = (job: Job): JobSummaryDto => ({
   featured: job.featured,
   skills: sortedSkillNames(job),
 });
+
+/** Nhiều tin nhất trước; bằng nhau thì theo tên (tiếng Việt). Dùng chung để hai provider cho cùng thứ tự. */
+export const sortCategoryCounts = (
+  categories: JobCategoryCount[],
+): JobCategoryCount[] =>
+  [...categories].sort(
+    (a, b) => b.count - a.count || a.name.localeCompare(b.name, 'vi'),
+  );

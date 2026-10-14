@@ -113,6 +113,15 @@ describe.each(backends)('JobBoard API (e2e) — $name', (backend) => {
       expect(res.body.title).toBe('Dữ liệu không hợp lệ');
     });
 
+    it('danh sách lĩnh vực đang tuyển (không nhầm với :id)', async () => {
+      const res = await http().get('/api/jobs/categories').expect(200);
+      expect(res.body.length).toBeGreaterThan(2);
+      expect(res.body[0]).toEqual({
+        name: expect.any(String),
+        count: expect.any(Number),
+      });
+    });
+
     it('chi tiết tin: 200 và 404', async () => {
       await http().get('/api/jobs/1').expect(200);
       await http().get('/api/jobs/9999').expect(404);

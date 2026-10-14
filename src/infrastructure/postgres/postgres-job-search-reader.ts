@@ -1,11 +1,15 @@
 import {
+  JobCategoryCount,
   JobSearchCriteria,
   JobSearchPage,
   JobSearchReader,
 } from '../../application/abstractions/persistence';
 import { JobSummaryDto } from '../../application/jobs/dto';
-import { compareSkillNames } from '../../application/jobs/job-mapping';
-import { Clock, JobLevel, WorkMode } from '../../domain';
+import {
+  compareSkillNames,
+  sortCategoryCounts,
+} from '../../application/jobs/job-mapping';
+import { Clock, JobLevel, JobStatus, WorkMode } from '../../domain';
 import { Database } from './database';
 import { buildJobCountQuery, buildJobSearchQuery } from './job-search-query';
 
@@ -52,6 +56,19 @@ export class PostgresJobSearchReader extends JobSearchReader {
     }
 
     return { items: rows.map(toSummary), total };
+  }
+
+  async categories(): Promise<JobCategoryCount[]> {
+    const { rows } = await this.db.query<{ category: string; total: string }>(
+      `SELECT category, count(*) AS total FROM jobs
+        WHERE status = $1 AND deadline > $2 AND category <> ''
+        GROUP BY category`,
+      [JobStatus.Published, this.clock.utcNow],
+    );
+
+    return sortCategoryCounts(
+      rows.map((row) => ({ name: row.category, count: Number(row.total) })),
+    );
   }
 }
 

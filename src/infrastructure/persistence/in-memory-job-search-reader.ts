@@ -1,11 +1,15 @@
 import {
+  JobCategoryCount,
   JobRepository,
   JobSearchCriteria,
   JobSearchPage,
   JobSearchReader,
 } from '../../application/abstractions/persistence';
 import { JobSortOrder } from '../../application/jobs/dto';
-import { toJobSummary } from '../../application/jobs/job-mapping';
+import {
+  sortCategoryCounts,
+  toJobSummary,
+} from '../../application/jobs/job-mapping';
 import { foldText } from '../../application/common/text-folding';
 import { Job, JobStatus } from '../../domain';
 
@@ -35,6 +39,24 @@ export class InMemoryJobSearchReader extends JobSearchReader {
       items: filtered.slice(start, start + criteria.pageSize).map(toJobSummary),
       total: filtered.length,
     };
+  }
+
+  async categories(): Promise<JobCategoryCount[]> {
+    const counts = new Map<string, number>();
+    for (const job of await this.jobs.getAll()) {
+      if (
+        job.status !== JobStatus.Published ||
+        job.isExpired ||
+        !job.category
+      ) {
+        continue;
+      }
+      counts.set(job.category, (counts.get(job.category) ?? 0) + 1);
+    }
+
+    return sortCategoryCounts(
+      [...counts].map(([name, count]) => ({ name, count })),
+    );
   }
 }
 

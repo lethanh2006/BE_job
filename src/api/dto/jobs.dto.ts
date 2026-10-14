@@ -144,3 +144,9 @@ export class EmployerJobDetailResponseDto extends EmployerJobResponseDto {
   skills!: string[];
   featured!: boolean;
 }
+
+export class JobCategoryResponseDto {
+  name!: string;
+  /** Số tin đang tuyển trong lĩnh vực. */
+  count!: number;
+}

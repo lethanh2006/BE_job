@@ -507,6 +507,18 @@ describeWithPostgres('Tìm kiếm tin: PostgreSQL khớp bản in-memory', () =>
     }
   });
 
+  it('đếm lĩnh vực giống bản in-memory', async () => {
+    const entities = await new PostgresJobRepository(db, clock).getAll();
+    const expected = await new InMemoryJobSearchReader(
+      new FakeJobRepository().seed(...entities),
+    ).categories();
+
+    const actual = await new PostgresJobSearchReader(db, clock).categories();
+
+    expect(actual).toEqual(expected);
+    expect(actual.length).toBeGreaterThan(2);
+  });
+
   it('chỉ trả tin Published còn hạn', async () => {
     const { items } = await new PostgresJobSearchReader(db, clock).search(
       baseCriteria,

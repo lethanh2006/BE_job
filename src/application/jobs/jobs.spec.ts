@@ -152,6 +152,24 @@ describe('JobSearchService', () => {
     ).toEqual([]);
   });
 
+  it('đếm lĩnh vực của tin đang tuyển, nhiều tin nhất trước', async () => {
+    const expiringClock = new MutableClock();
+    jobs.seed(
+      makeJob(clock, { id: 1, category: 'Dữ liệu' }),
+      makeJob(clock, { id: 2, category: 'Lập trình Backend' }),
+      makeJob(clock, { id: 3, category: 'Lập trình Backend' }),
+      makeJob(clock, { id: 4, category: 'Thiết kế', publish: false }),
+      makeJob(expiringClock, { id: 5, category: 'Thiết kế' }),
+      makeJob(clock, { id: 6, category: '' }),
+    );
+    expiringClock.advanceDays(8);
+
+    expect(await service.categories()).toEqual([
+      { name: 'Lập trình Backend', count: 2 },
+      { name: 'Dữ liệu', count: 1 },
+    ]);
+  });
+
   it.each([
     [0, 20],
     [1, 0],

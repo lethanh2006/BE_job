@@ -69,4 +69,11 @@ export interface JobSearchPage {
  */
 export abstract class JobSearchReader {
   abstract search(criteria: JobSearchCriteria): Promise<JobSearchPage>;
+  /** Các lĩnh vực của tin đang tuyển kèm số tin, nhiều tin nhất trước. */
+  abstract categories(): Promise<JobCategoryCount[]>;
+}
+
+export interface JobCategoryCount {
+  name: string;
+  count: number;
 }
