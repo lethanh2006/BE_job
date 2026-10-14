@@ -157,3 +157,81 @@ describe('AppConfig: bảo mật', () => {
     );
   });
 });
+
+describe('AppConfig: dữ liệu demo và quản trị viên đầu tiên', () => {
+  it('nạp dữ liệu demo mặc định khi áp migration ngoài production, không nạp ở production', () => {
+    expect(AppConfig.fromEnv({}).persistence.seedDemoData).toBe(false);
+    expect(
+      AppConfig.fromEnv({ PERSISTENCE_APPLY_MIGRATIONS: 'true' }).persistence
+        .seedDemoData,
+    ).toBe(true);
+    expect(
+      AppConfig.fromEnv({
+        ...production,
+        PERSISTENCE_PROVIDER: 'PostgreSql',
+        DATABASE_URL: 'postgres://u:p@db:5432/jobboard',
+        PERSISTENCE_APPLY_MIGRATIONS: 'true',
+      }).persistence.seedDemoData,
+    ).toBe(false);
+  });
+
+  it('PERSISTENCE_SEED_DEMO_DATA ghi đè mặc định ở cả hai chiều', () => {
+    expect(
+      AppConfig.fromEnv({
+        PERSISTENCE_APPLY_MIGRATIONS: 'true',
+        PERSISTENCE_SEED_DEMO_DATA: 'false',
+      }).persistence.seedDemoData,
+    ).toBe(false);
+    expect(
+      AppConfig.fromEnv({
+        ...production,
+        PERSISTENCE_SEED_DEMO_DATA: 'true',
+      }).persistence.seedDemoData,
+    ).toBe(true);
+  });
+
+  it('đọc quản trị viên đầu tiên, tên mặc định "Quản trị viên"', () => {
+    expect(AppConfig.fromEnv({}).persistence.bootstrapAdmin).toBeNull();
+    expect(
+      AppConfig.fromEnv({
+        BOOTSTRAP_ADMIN_EMAIL: ' chu@example.com ',
+        BOOTSTRAP_ADMIN_PASSWORD: 'MatKhauAdmin#2026',
+      }).persistence.bootstrapAdmin,
+    ).toEqual({
+      name: 'Quản trị viên',
+      email: 'chu@example.com',
+      password: 'MatKhauAdmin#2026',
+    });
+    expect(
+      AppConfig.fromEnv({
+        BOOTSTRAP_ADMIN_EMAIL: 'chu@example.com',
+        BOOTSTRAP_ADMIN_PASSWORD: 'MatKhauAdmin#2026',
+        BOOTSTRAP_ADMIN_NAME: 'Chủ Hệ Thống',
+      }).persistence.bootstrapAdmin?.name,
+    ).toBe('Chủ Hệ Thống');
+  });
+
+  it.each([
+    [{ BOOTSTRAP_ADMIN_EMAIL: 'chu@example.com' }, 'phải được đặt cùng nhau'],
+    [
+      { BOOTSTRAP_ADMIN_PASSWORD: 'MatKhauAdmin#2026' },
+      'phải được đặt cùng nhau',
+    ],
+    [
+      {
+        BOOTSTRAP_ADMIN_EMAIL: 'khong-phai-email',
+        BOOTSTRAP_ADMIN_PASSWORD: 'MatKhauAdmin#2026',
+      },
+      'BOOTSTRAP_ADMIN_EMAIL không hợp lệ',
+    ],
+    [
+      {
+        BOOTSTRAP_ADMIN_EMAIL: 'chu@example.com',
+        BOOTSTRAP_ADMIN_PASSWORD: 'yeu',
+      },
+      'không đạt chính sách mật khẩu',
+    ],
+  ])('từ chối cấu hình quản trị viên sai %j', (env, expected) => {
+    expect(() => AppConfig.fromEnv(env)).toThrow(expected);
+  });
+});

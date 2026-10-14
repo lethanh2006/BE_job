@@ -65,6 +65,8 @@ npm run lint
 | `PERSISTENCE_PROVIDER` | `InMemory` | `InMemory` hoặc `PostgreSql` |
 | `DATABASE_URL` | URL dev ở cổng 5434 | Bắt buộc khi `NODE_ENV=production` và dùng PostgreSql |
 | `PERSISTENCE_APPLY_MIGRATIONS` | `false` | `true`: áp migration và nạp dữ liệu mẫu cho bảng còn trống khi khởi động |
+| `PERSISTENCE_SEED_DEMO_DATA` | `true` khi áp migration ngoài production, `false` ở production | Nạp việc làm, công ty và 3 tài khoản demo (mật khẩu công khai) vào bảng còn trống. **Đừng bật cho dữ liệu thật** |
+| `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` | — | Đặt cùng nhau: khi áp migration, nếu chưa có quản trị viên nào thì tạo một tài khoản Admin (mật khẩu phải đạt chính sách). Khởi động lại không đặt lại mật khẩu đã đổi. `BOOTSTRAP_ADMIN_NAME` (mặc định "Quản trị viên") |
 | `STORAGE_DIR` | `./storage` | Thư mục lưu tệp CV khi dùng PostgreSql (InMemory giữ tệp trong bộ nhớ) |
 | `FRONTEND_URL` | origin CORS đầu tiên (dev: `http://localhost:3000`) | Địa chỉ frontend để dựng liên kết đặt lại mật khẩu; **bắt buộc** ở production nếu không đặt `CORS_ALLOWED_ORIGINS` |
 | `PASSWORD_RESET_MINUTES` | `30` | Thời hạn liên kết đặt lại mật khẩu (1–1440 phút) |

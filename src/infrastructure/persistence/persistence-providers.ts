@@ -244,7 +244,10 @@ function postgresProviders(config: AppConfig): Provider[] {
       provide: DatabaseInitializer,
       inject: [Database, Clock, PasswordHasher],
       useFactory: (db: Database, clock: Clock, hasher: PasswordHasher) =>
-        new DatabaseInitializer(db, clock, hasher, JOB_SEED_FILE),
+        new DatabaseInitializer(db, clock, hasher, JOB_SEED_FILE, {
+          seedDemoData: config.persistence.seedDemoData,
+          bootstrapAdmin: config.persistence.bootstrapAdmin,
+        }),
     });
   }
 

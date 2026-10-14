@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { validatePassword } from '../application/auth/password-policy';
 
 export interface JwtConfig {
   issuer: string;
@@ -47,12 +48,25 @@ export interface SecurityConfig {
 
 export type PersistenceProvider = 'InMemory' | 'PostgreSql';
 
+export interface BootstrapAdminConfig {
+  name: string;
+  email: string;
+  password: string;
+}
+
 export interface PersistenceConfig {
   provider: PersistenceProvider;
   /** Chuỗi kết nối PostgreSQL; chỉ có khi provider là PostgreSql. */
   databaseUrl: string | null;
-  /** Tự áp migration và seed dữ liệu mẫu khi khởi động. */
+  /** Tự áp migration khi khởi động (và nạp dữ liệu mẫu nếu `seedDemoData`). */
   applyMigrations: boolean;
+  /**
+   * Nạp việc làm, công ty và 3 tài khoản demo (mật khẩu công khai) vào bảng còn trống. Mặc định chỉ
+   * bật ngoài production để cơ sở dữ liệu thật không có tài khoản ai cũng biết mật khẩu.
+   */
+  seedDemoData: boolean;
+  /** Tạo quản trị viên đầu tiên khi áp migration nếu chưa có quản trị viên nào. */
+  bootstrapAdmin: BootstrapAdminConfig | null;
 }
 
 const DEV_DATABASE_URL =
@@ -69,6 +83,8 @@ export class AppConfig {
       provider: 'InMemory',
       databaseUrl: null,
       applyMigrations: false,
+      seedDemoData: false,
+      bootstrapAdmin: null,
     },
     /** Phát OpenAPI/Swagger UI; mặc định bật ở môi trường không phải production. */
     readonly openApiEnabled = false,
@@ -107,6 +123,7 @@ export class AppConfig {
       throw new Error('DATABASE_URL là bắt buộc khi dùng PostgreSql.');
     }
 
+    const applyMigrations = env.PERSISTENCE_APPLY_MIGRATIONS === 'true';
     const signingKey =
       env.JWT_SIGNING_KEY ??
       (isProduction
@@ -146,7 +163,11 @@ export class AppConfig {
       {
         provider,
         databaseUrl,
-        applyMigrations: env.PERSISTENCE_APPLY_MIGRATIONS === 'true',
+        applyMigrations,
+        seedDemoData: env.PERSISTENCE_SEED_DEMO_DATA
+          ? env.PERSISTENCE_SEED_DEMO_DATA === 'true'
+          : applyMigrations && !isProduction,
+        bootstrapAdmin: AppConfig.bootstrapAdminFromEnv(env),
       },
       env.OPENAPI_ENABLED ? env.OPENAPI_ENABLED === 'true' : !isProduction,
       resolve(env.STORAGE_DIR ?? 'storage'),
@@ -159,6 +180,37 @@ export class AppConfig {
         trustProxy: AppConfig.trustProxyFromEnv(env.TRUST_PROXY, isProduction),
       },
     );
+  }
+
+  /** Cả email và mật khẩu phải đi cùng nhau; mật khẩu phải đạt chính sách như mọi tài khoản khác. */
+  private static bootstrapAdminFromEnv(
+    env: NodeJS.ProcessEnv,
+  ): BootstrapAdminConfig | null {
+    const email = env.BOOTSTRAP_ADMIN_EMAIL?.trim();
+    const password = env.BOOTSTRAP_ADMIN_PASSWORD;
+    if (!email && !password) return null;
+    if (!email || !password) {
+      throw new Error(
+        'BOOTSTRAP_ADMIN_EMAIL và BOOTSTRAP_ADMIN_PASSWORD phải được đặt cùng nhau.',
+      );
+    }
+    if (email.length > 320 || !email.includes('@')) {
+      throw new Error('BOOTSTRAP_ADMIN_EMAIL không hợp lệ.');
+    }
+
+    try {
+      validatePassword(password);
+    } catch (error) {
+      throw new Error(
+        `BOOTSTRAP_ADMIN_PASSWORD không đạt chính sách mật khẩu: ${error instanceof Error ? error.message : ''}`,
+      );
+    }
+
+    return {
+      name: env.BOOTSTRAP_ADMIN_NAME?.trim() || 'Quản trị viên',
+      email,
+      password,
+    };
   }
 
   /** Ngoài production tin proxy loopback (frontend chạy cùng máy); production phải khai báo rõ. */
