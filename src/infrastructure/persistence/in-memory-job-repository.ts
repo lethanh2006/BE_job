@@ -11,7 +11,7 @@ import {
 } from '../../domain';
 import { JobRepository } from '../../application/abstractions/persistence';
 
-interface JobSeed {
+export interface JobSeed {
   id: number;
   title: string;
   companyId: number;
@@ -31,6 +31,25 @@ interface JobSeed {
   status: JobStatus;
   featured: boolean;
   skills: string[];
+}
+
+const DAY_MS = 86_400_000;
+const MIN_REMAINING_MS = 14 * DAY_MS;
+
+/**
+ * Dữ liệu mẫu có ngày cố định sẽ hết hạn theo thời gian; dịch tất cả ngày đi một số ngày
+ * nguyên để tin đang đăng sớm nhất luôn còn ít nhất 14 ngày. Quan hệ giữa các ngày giữ nguyên.
+ */
+export function seedDateShiftMs(seeds: readonly JobSeed[], now: Date): number {
+  const open = seeds.filter((seed) => seed.status === JobStatus.Published);
+  if (open.length === 0) return 0;
+
+  const earliestDeadline = Math.min(
+    ...open.map((seed) => Date.parse(seed.deadline)),
+  );
+  const missing = now.getTime() + MIN_REMAINING_MS - earliestDeadline;
+
+  return missing > 0 ? Math.ceil(missing / DAY_MS) * DAY_MS : 0;
 }
 
 /** Repository lưu trong bộ nhớ, nạp dữ liệu ban đầu từ file JSON seed. */
@@ -88,9 +107,10 @@ export class InMemoryJobRepository extends JobRepository {
 
     this.loading ??= readFile(this.seedFilePath, 'utf8').then((content) => {
       const seeds = JSON.parse(content) as JobSeed[];
+      const shiftMs = seedDateShiftMs(seeds, this.clock.utcNow);
       this.jobs = new Map(
         seeds.map((seed) => {
-          const job = this.toJob(seed);
+          const job = this.toJob(seed, shiftMs);
           return [job.id, job] as const;
         }),
       );
@@ -101,13 +121,13 @@ export class InMemoryJobRepository extends JobRepository {
     return this.loading;
   }
 
-  private toJob(seed: JobSeed): Job {
+  private toJob(seed: JobSeed, shiftMs: number): Job {
     const job = Job.restore({
       id: seed.id,
       title: seed.title,
       companyId: seed.companyId,
       salary: new SalaryRange(seed.salaryMin, seed.salaryMax),
-      deadline: new Date(seed.deadline),
+      deadline: new Date(Date.parse(seed.deadline) + shiftMs),
       clock: this.clock,
       company: new Company(seed.companyId, seed.company, seed.location),
       location: seed.location,
@@ -118,7 +138,7 @@ export class InMemoryJobRepository extends JobRepository {
       description: seed.description,
       requirements: seed.requirements,
       benefits: seed.benefits,
-      postedAt: new Date(seed.postedAt),
+      postedAt: new Date(Date.parse(seed.postedAt) + shiftMs),
       featured: seed.featured,
       status: seed.status,
     });

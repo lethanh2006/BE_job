@@ -2,7 +2,11 @@ import { join } from 'node:path';
 import { ApplicationStatus, JobApplication, JobStatus } from '../../domain';
 import { MutableClock, makeJob } from '../../testing/test-helpers';
 import { InMemoryJobApplicationRepository } from './in-memory-job-application-repository';
-import { InMemoryJobRepository } from './in-memory-job-repository';
+import {
+  InMemoryJobRepository,
+  JobSeed,
+  seedDateShiftMs,
+} from './in-memory-job-repository';
 
 describe('InMemoryJobRepository', () => {
   const seedFile = join(__dirname, '..', '..', 'data', 'seed', 'jobs.json');
@@ -59,5 +63,36 @@ describe('InMemoryJobApplicationRepository', () => {
       ApplicationStatus.Submitted,
     );
     expect(await repository.getByJobId(2)).toHaveLength(1);
+  });
+});
+
+describe('seedDateShiftMs', () => {
+  const day = 86_400_000;
+  const seed = (deadline: string, status = JobStatus.Published) =>
+    ({ deadline, status }) as JobSeed;
+
+  it('không dịch khi mọi tin đang đăng còn hơn 14 ngày', () => {
+    const now = new Date('2026-01-01T00:00:00Z');
+    expect(seedDateShiftMs([seed('2026-02-01T00:00:00Z')], now)).toBe(0);
+  });
+
+  it('dịch một số ngày nguyên để tin sớm nhất còn ít nhất 14 ngày', () => {
+    const now = new Date('2026-03-01T12:00:00Z');
+    const shift = seedDateShiftMs(
+      [seed('2026-01-10T00:00:00Z'), seed('2026-02-01T00:00:00Z')],
+      now,
+    );
+
+    expect(shift % day).toBe(0);
+    const earliest = Date.parse('2026-01-10T00:00:00Z') + shift;
+    expect(earliest - now.getTime()).toBeGreaterThanOrEqual(14 * day);
+    expect(earliest - now.getTime()).toBeLessThan(15 * day);
+  });
+
+  it('bỏ qua tin không ở trạng thái đang đăng', () => {
+    const now = new Date('2030-01-01T00:00:00Z');
+    expect(
+      seedDateShiftMs([seed('2020-01-01T00:00:00Z', JobStatus.Closed)], now),
+    ).toBe(0);
   });
 });
