@@ -66,6 +66,13 @@ npm run lint
 | `DATABASE_URL` | URL dev ở cổng 5434 | Bắt buộc khi `NODE_ENV=production` và dùng PostgreSql |
 | `PERSISTENCE_APPLY_MIGRATIONS` | `false` | `true`: áp migration và nạp dữ liệu mẫu cho bảng còn trống khi khởi động |
 | `STORAGE_DIR` | `./storage` | Thư mục lưu tệp CV khi dùng PostgreSql (InMemory giữ tệp trong bộ nhớ) |
+| `FRONTEND_URL` | origin CORS đầu tiên (dev: `http://localhost:3000`) | Địa chỉ frontend để dựng liên kết đặt lại mật khẩu; **bắt buộc** ở production nếu không đặt `CORS_ALLOWED_ORIGINS` |
+| `PASSWORD_RESET_MINUTES` | `30` | Thời hạn liên kết đặt lại mật khẩu (1–1440 phút) |
+| `EMAIL_PROVIDER` | `Log` | `Log` (ghi log, không gửi thật) hoặc `Smtp` |
+| `SMTP_HOST` / `SMTP_PORT` | — / `587` | Bắt buộc `SMTP_HOST` khi `EMAIL_PROVIDER=Smtp` |
+| `SMTP_SECURE` | `true` nếu cổng 465 | TLS ngay từ đầu kết nối; cổng khác dùng STARTTLS khi máy chủ hỗ trợ |
+| `SMTP_USER` / `SMTP_PASSWORD` | — | Đặt cùng nhau hoặc bỏ cả hai |
+| `EMAIL_FROM` | `JobBoard <no-reply@jobboard.vn>` | Người gửi hiển thị trong email |
 | `OPENAPI_ENABLED` | bật ngoài production | Phát `/api/docs` và `/api/openapi.json` |
 
 ## Tài khoản demo
@@ -89,7 +96,7 @@ Tất cả route nằm dưới tiền tố `/api`.
 
 - `GET /health`
 - `GET /jobs` (lọc `keyword`, `location`, `category`, `level`, `minimumSalary`, `skills` lặp lại, `page`, `pageSize`, `sort`), `GET /jobs/categories`, `GET /jobs/:id` (bản nháp trả 404), `GET /companies/:id` (hồ sơ công khai; tin của công ty: `GET /jobs?companyId=`)
-- `POST /auth/login`, `POST /auth/register/candidate`, `POST /auth/register/employer` (tạo công ty + tài khoản quản lý), `POST /auth/refresh`, `POST /auth/logout`, `PUT /auth/password`, `GET /auth/me`
+- `POST /auth/login`, `POST /auth/register/candidate`, `POST /auth/register/employer` (tạo công ty + tài khoản quản lý), `POST /auth/refresh`, `POST /auth/logout`, `PUT /auth/password`, `POST /auth/forgot-password`, `POST /auth/reset-password`, `GET /auth/me`
 - `POST /applications` (Candidate), `PATCH /applications/:id/status` (Employer)
 - `GET /notifications` (`unreadOnly`, `page`, `pageSize`), `GET /notifications/unread-count`,
   `PATCH /notifications/:id/read`, `PATCH /notifications/read-all` (đã đăng nhập, chỉ dữ liệu của chính mình)
@@ -179,6 +186,23 @@ Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`,
 - Nội dung tệp nằm ở kho tệp (`FileStorage`): thư mục cục bộ `STORAGE_DIR` với khóa UUID (không thể path traversal) khi
   dùng PostgreSql, hoặc bộ nhớ khi dùng InMemory. Thông tin mô tả nằm ở bảng `candidate_files` (migration `0007`); index
   unique từng phần bảo đảm mỗi ứng viên chỉ có một CV hiện tại ngay cả khi hai lần tải chạy song song. Chưa có quét virus.
+
+## Quên mật khẩu
+
+- `POST /auth/forgot-password` `{ email }` **luôn trả 202** dù email có tồn tại, bị khóa hay bị giới hạn tần suất,
+  để không dùng được nó dò xem email nào đã đăng ký. Chỉ tài khoản có thật và đang hoạt động mới nhận email chứa liên kết
+  `FRONTEND_URL/dat-lai-mat-khau?token=...`.
+- Token là 256 bit ngẫu nhiên, **chỉ lưu hash SHA-256** (`password_reset_tokens`, migration `0008`), sống
+  `PASSWORD_RESET_MINUTES` phút và dùng được **một lần**. Mỗi tài khoản chỉ có một liên kết còn hiệu lực (yêu cầu mới vô
+  hiệu hóa liên kết cũ) và nhận tối đa 3 email mỗi giờ (chống dội thư). Token đã hết hạn được dọn sau một ngày.
+- `POST /auth/reset-password` `{ token, newPassword }`: kiểm tra mật khẩu theo chính sách trước (mật khẩu yếu không làm mất
+  liên kết), rồi dùng token và đặt mật khẩu trong **một giao dịch** (hai request song song chỉ một request thành công).
+  Token sai, đã dùng, hết hạn hoặc thuộc tài khoản đã bị khóa đều trả cùng một lỗi 400. Thành công thì thu hồi mọi phiên
+  đăng nhập và gửi email xác nhận.
+- Gửi email qua cổng `EmailSender`: `EMAIL_PROVIDER=Log` (mặc định) chỉ ghi log, ngoài production in cả nội dung nên lấy
+  được liên kết từ log khi phát triển, còn ở production **không** in nội dung vì có token; `Smtp` gửi thật bằng nodemailer
+  (từ chối địa chỉ nhận có ký tự có thể chèn header). Lỗi gửi email chỉ được ghi log, không làm hỏng yêu cầu.
+- Chưa có giới hạn tần suất theo IP (chỉ giới hạn theo tài khoản) và việc gửi email chạy ngay trong request, chưa qua hàng đợi.
 
 ## Cơ sở dữ liệu
 

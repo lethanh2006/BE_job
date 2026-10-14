@@ -4,12 +4,18 @@ import {
   AccessTokenGenerator,
   PasswordHasher,
   RefreshTokenGenerator,
+  ResetTokenGenerator,
 } from './application/abstractions/authentication';
+import { EmailSender } from './application/abstractions/email';
 import { ApplicationNotifier } from './application/abstractions/notifications';
 import { ApplicationQueryService } from './application/applications/application-query.service';
 import { ApplicationService } from './application/applications/application.service';
 import { LoginService } from './application/auth/login.service';
 import { PasswordChangeService } from './application/auth/password-change.service';
+import {
+  PasswordResetService,
+  PasswordResetSettings,
+} from './application/auth/password-reset.service';
 import { RegistrationService } from './application/auth/registration.service';
 import { SessionService } from './application/auth/session.service';
 import { AdminModerationService } from './application/admin/admin-moderation.service';
@@ -41,6 +47,8 @@ import { Clock, SystemClock } from './domain';
 import { JwtAccessTokenGenerator } from './infrastructure/auth/jwt-access-token-generator';
 import { Pbkdf2PasswordHasher } from './infrastructure/auth/pbkdf2-password-hasher';
 import { SecureRefreshTokenGenerator } from './infrastructure/auth/secure-refresh-token-generator';
+import { SecureResetTokenGenerator } from './infrastructure/auth/secure-reset-token-generator';
+import { createEmailSender } from './infrastructure/email/create-email-sender';
 import { persistenceProviders } from './infrastructure/persistence/persistence-providers';
 
 @Module({
@@ -70,6 +78,20 @@ import { persistenceProviders } from './infrastructure/persistence/persistence-p
           config.jwt.refreshTokenDays * 24 * 60 * 60 * 1000,
         ),
     },
+    { provide: ResetTokenGenerator, useClass: SecureResetTokenGenerator },
+    {
+      provide: EmailSender,
+      inject: [AppConfig],
+      useFactory: (config: AppConfig) => createEmailSender(config.email),
+    },
+    {
+      provide: PasswordResetSettings,
+      inject: [AppConfig],
+      useFactory: (config: AppConfig): PasswordResetSettings => ({
+        resetPageUrl: config.passwordReset.resetPageUrl,
+        tokenLifetimeMinutes: config.passwordReset.tokenMinutes,
+      }),
+    },
     NotificationService,
     { provide: ApplicationNotifier, useExisting: NotificationService },
     JobMatchService,
@@ -88,6 +110,7 @@ import { persistenceProviders } from './infrastructure/persistence/persistence-p
     SessionService,
     RegistrationService,
     PasswordChangeService,
+    PasswordResetService,
     JwtAuthGuard,
     RolesGuard,
     { provide: APP_FILTER, useClass: ProblemDetailsFilter },

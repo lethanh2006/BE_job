@@ -1,6 +1,7 @@
 import { Clock } from '../../domain';
 import { Pbkdf2PasswordHasher } from './pbkdf2-password-hasher';
 import { SecureRefreshTokenGenerator } from './secure-refresh-token-generator';
+import { SecureResetTokenGenerator } from './secure-reset-token-generator';
 
 describe('Pbkdf2PasswordHasher', () => {
   const hasher = new Pbkdf2PasswordHasher();
@@ -36,5 +37,21 @@ describe('SecureRefreshTokenGenerator', () => {
     expect(first.session.expiresAt.toISOString()).toBe(
       '2026-10-08T00:00:00.000Z',
     );
+  });
+});
+
+describe('SecureResetTokenGenerator', () => {
+  const generator = new SecureResetTokenGenerator();
+
+  it('sinh token 256 bit ngẫu nhiên, chỉ hash SHA-256 mới được lưu', () => {
+    const first = generator.generate();
+    const second = generator.generate();
+
+    expect(first.value).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(first.value).not.toBe(second.value);
+    expect(first.hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(generator.hash(first.value)).toBe(first.hash);
+    expect(first.hash).not.toContain(first.value);
+    expect(() => generator.hash('  ')).toThrow();
   });
 });

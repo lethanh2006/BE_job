@@ -33,6 +33,17 @@ export class ChangePasswordDto {
   @IsString() @MaxLength(128) newPassword!: string;
 }
 
+export class ForgotPasswordDto {
+  @IsString() @MaxLength(320) email!: string;
+}
+
+export class ResetPasswordDto {
+  /** Token trong liên kết đặt lại mật khẩu gửi qua email. */
+  @IsString() @MaxLength(256) token!: string;
+  /** Tối thiểu 10 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt. */
+  @IsString() @MaxLength(128) newPassword!: string;
+}
+
 export class AuthenticatedUserResponseDto {
   id!: number;
   name!: string;

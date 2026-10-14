@@ -19,6 +19,7 @@ import {
   CurrentPasswordIncorrectException,
   EmailAlreadyExistsException,
   InvalidCredentialsException,
+  InvalidPasswordResetTokenException,
   InvalidRefreshTokenException,
   ResourceNotFoundException,
 } from '../../application/exceptions';
@@ -72,6 +73,12 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     }
     if (exception instanceof CurrentPasswordIncorrectException) {
       return make(HttpStatus.BAD_REQUEST, 'Không thể đổi mật khẩu');
+    }
+    if (exception instanceof InvalidPasswordResetTokenException) {
+      return make(
+        HttpStatus.BAD_REQUEST,
+        'Liên kết đặt lại mật khẩu không hợp lệ',
+      );
     }
     if (exception instanceof CompanyNameAlreadyExistsException) {
       return make(HttpStatus.CONFLICT, 'Tên công ty đã tồn tại');

@@ -128,6 +128,21 @@ export class InMemoryUserAccountRepository
     return Promise.resolve(true);
   }
 
+  /**
+   * Đặt mật khẩu mà không cần mật khẩu cũ (đặt lại qua email). Chạy đồng bộ để repository token
+   * kiểm tra và dùng token mà không xen await; false nếu tài khoản không có hoặc đang bị khóa.
+   */
+  resetPassword(userId: number, newPasswordHash: string): boolean {
+    const current = [...this.accounts.values()].find((a) => a.id === userId);
+    if (!current || current.disabled) return false;
+
+    this.accounts.set(current.email.toLowerCase(), {
+      ...current,
+      passwordHash: newPasswordHash,
+    });
+    return true;
+  }
+
   /** Toàn bộ tài khoản (kèm tên công ty), phục vụ trang quản trị của provider in-memory. */
   async listAll(): Promise<UserAccount[]> {
     return Promise.all(

@@ -5,3 +5,4 @@ export class CurrentPasswordIncorrectException extends Error {}
 export class EmailAlreadyExistsException extends Error {}
 export class CompanyNameAlreadyExistsException extends Error {}
 export class AccountDisabledException extends Error {}
+export class InvalidPasswordResetTokenException extends Error {}

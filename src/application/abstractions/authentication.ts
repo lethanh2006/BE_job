@@ -2,6 +2,7 @@ import { Candidate, Company } from '../../domain';
 import {
   AccessToken,
   IssuedRefreshToken,
+  PasswordResetToken,
   RefreshTokenSession,
   UserAccount,
 } from '../auth';
@@ -71,4 +72,28 @@ export abstract class RefreshTokenRepository {
   abstract revokeByHash(tokenHash: string, revokedAt: Date): Promise<void>;
   abstract revokeFamily(familyId: string, revokedAt: Date): Promise<void>;
   abstract revokeByUser(userId: number, revokedAt: Date): Promise<void>;
+}
+
+export abstract class ResetTokenGenerator {
+  /** Token ngẫu nhiên đủ mạnh để không đoán được, kèm hash để lưu trữ. */
+  abstract generate(): { value: string; hash: string };
+  abstract hash(token: string): string;
+}
+
+export abstract class PasswordResetRepository {
+  /** Lưu token mới và vô hiệu hóa mọi token còn hiệu lực trước đó của cùng tài khoản. */
+  abstract issue(token: PasswordResetToken): Promise<void>;
+  /** Số token đã cấp cho tài khoản từ mốc `since` (kể cả đã dùng/hết hạn), để giới hạn tần suất. */
+  abstract countIssuedSince(userId: number, since: Date): Promise<number>;
+  /**
+   * Dùng token một lần. Chỉ khi token còn hiệu lực và tài khoản chưa bị khóa thì đặt mật khẩu mới,
+   * đánh dấu token đã dùng và vô hiệu các token khác của tài khoản trong cùng một thao tác; hai
+   * request song song với cùng một token chỉ một request thành công.
+   * Trả về mã tài khoản, hoặc null nếu token không tồn tại/đã dùng/hết hạn/tài khoản bị khóa.
+   */
+  abstract redeem(
+    tokenHash: string,
+    newPasswordHash: string,
+    now: Date,
+  ): Promise<number | null>;
 }

@@ -6,6 +6,7 @@ import { moderation } from './migrations/0004-moderation';
 import { notifications } from './migrations/0005-notifications';
 import { savedJobs } from './migrations/0006-saved-jobs';
 import { candidateFiles } from './migrations/0007-candidate-files';
+import { passwordResets } from './migrations/0008-password-resets';
 import type { Migration } from './migrations/migration';
 
 /** Danh sách migration theo thứ tự; chỉ thêm vào cuối, không sửa migration đã phát hành. */
@@ -17,6 +18,7 @@ export const allMigrations: readonly Migration[] = [
   notifications,
   savedJobs,
   candidateFiles,
+  passwordResets,
 ];
 
 /** Khóa advisory để nhiều instance khởi động cùng lúc không áp migration song song. */

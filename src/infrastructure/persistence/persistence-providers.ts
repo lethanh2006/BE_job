@@ -14,6 +14,7 @@ import {
   AccountSecurityRepository,
   EmployerRegistrationRepository,
   PasswordHasher,
+  PasswordResetRepository,
   RefreshTokenRepository,
   UserAccountRepository,
 } from '../../application/abstractions/authentication';
@@ -37,6 +38,7 @@ import { PostgresJobApplicationRepository } from '../postgres/postgres-job-appli
 import { PostgresJobRepository } from '../postgres/postgres-job-repository';
 import { PostgresJobSearchReader } from '../postgres/postgres-job-search-reader';
 import { PostgresNotificationRepository } from '../postgres/postgres-notification-repository';
+import { PostgresPasswordResetRepository } from '../postgres/postgres-password-reset-repository';
 import { PostgresRefreshTokenRepository } from '../postgres/postgres-refresh-token-repository';
 import { PostgresSavedJobRepository } from '../postgres/postgres-saved-job-repository';
 import { PostgresUserAccountRepository } from '../postgres/postgres-user-account-repository';
@@ -52,6 +54,7 @@ import { InMemoryJobApplicationRepository } from './in-memory-job-application-re
 import { InMemoryJobRepository } from './in-memory-job-repository';
 import { InMemoryJobSearchReader } from './in-memory-job-search-reader';
 import { InMemoryNotificationRepository } from './in-memory-notification-repository';
+import { InMemoryPasswordResetRepository } from './in-memory-password-reset-repository';
 import { InMemoryRefreshTokenRepository } from './in-memory-refresh-token-repository';
 import { InMemorySavedJobRepository } from './in-memory-saved-job-repository';
 import { InMemoryUserAccountRepository } from './in-memory-user-account-repository';
@@ -118,6 +121,12 @@ function inMemoryProviders(): Provider[] {
         ),
     },
     ...accountAliases,
+    {
+      provide: PasswordResetRepository,
+      inject: [USER_ACCOUNTS],
+      useFactory: (accounts: InMemoryUserAccountRepository) =>
+        new InMemoryPasswordResetRepository(accounts),
+    },
     { provide: AuditLogRepository, useClass: InMemoryAuditLogRepository },
     {
       provide: NotificationRepository,
@@ -199,6 +208,11 @@ function postgresProviders(config: AppConfig): Provider[] {
       useFactory: (db: Database) => new PostgresUserAccountRepository(db),
     },
     ...accountAliases,
+    {
+      provide: PasswordResetRepository,
+      inject: [Database],
+      useFactory: (db: Database) => new PostgresPasswordResetRepository(db),
+    },
     {
       provide: AuditLogRepository,
       inject: [Database],
