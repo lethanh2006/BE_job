@@ -1,0 +1,69 @@
+# Chạy cả hệ thống để xem thử: PostgreSQL + API (repo này) + web (repo `fe` đặt cạnh repo này) + Mailpit.
+#   docker compose -f compose.stack.yaml up --build
+# Web tại http://localhost:3000, API tại http://localhost:5000/api/docs, hộp thư thử nghiệm tại http://localhost:8025.
+# Đây là bản DEMO: có dữ liệu mẫu và khóa JWT mặc định công khai. Đừng dùng cho dữ liệu thật; xem README mục "Triển khai".
+name: jobboard-stack
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jobboard
+      POSTGRES_USER: jobboard
+      POSTGRES_PASSWORD: jobboard_dev_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobboard -d jobboard"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAIL_UI_PORT:-8025}:8025"
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PERSISTENCE_PROVIDER: PostgreSql
+      DATABASE_URL: postgres://jobboard:jobboard_dev_password@postgres:5432/jobboard
+      PERSISTENCE_APPLY_MIGRATIONS: "true"
+      PERSISTENCE_SEED_DEMO_DATA: "true"
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-demo-only-signing-key-do-not-use-in-production-0123456789}
+      FRONTEND_URL: http://localhost:${WEB_PORT:-3000}
+      # Web gọi API từ container cùng mạng nội bộ: tin dải địa chỉ riêng để đọc IP thật từ X-Forwarded-For.
+      TRUST_PROXY: uniquelocal
+      EMAIL_PROVIDER: Smtp
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      EMAIL_FROM: JobBoard <no-reply@jobboard.local>
+    volumes:
+      - cv_storage:/data/storage
+    ports:
+      - "127.0.0.1:${API_PORT:-5000}:5000"
+
+  web:
+    build: ../fe
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      BACKEND_API_URL: http://api:5000/api
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+
+volumes:
+  postgres_data:
+  cv_storage:

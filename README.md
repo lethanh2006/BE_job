@@ -251,6 +251,18 @@ unique chống ứng tuyển trùng, index `(status, deadline)`, khóa ngoại).
 - Các tình huống chạy song song (ứng tuyển trùng, xoay token đồng thời) được chặn bằng ràng
   buộc/điều kiện ở chính câu lệnh SQL và có test tích hợp (`test/postgres.e2e-spec.ts`).
 
+## Triển khai
+
+- **Docker**: `docker build -t jobboard-api .` tạo image nhiều tầng (biên dịch rồi chỉ giữ `dist` và dependencies production),
+  chạy bằng người dùng không đặc quyền, có `HEALTHCHECK` gọi `/api/health/ready`. Tệp CV nằm ở volume `/data/storage`.
+- **Xem thử cả hệ thống**: `docker compose -f compose.stack.yaml up --build` dựng PostgreSQL, API, web (repo `fe` phải nằm
+  cạnh repo này, tức `../fe`) và Mailpit để đọc email đặt lại mật khẩu tại <http://localhost:8025>. Đây là bản demo có dữ
+  liệu mẫu và khóa JWT công khai; đổi cổng bằng `WEB_PORT`, `API_PORT`, `MAIL_UI_PORT`.
+- **Production thật**: đặt `NODE_ENV=production`, `JWT_SIGNING_KEY` riêng, `DATABASE_URL`, `PERSISTENCE_APPLY_MIGRATIONS=true`,
+  `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD` cho quản trị viên đầu tiên (không nạp dữ liệu demo), `FRONTEND_URL`,
+  `TRUST_PROXY` đúng với hạ tầng và `EMAIL_PROVIDER=Smtp`. Sao lưu cả PostgreSQL lẫn thư mục `STORAGE_DIR`.
+- **CI**: `.github/workflows/ci.yml` chạy lint, build, test đơn vị và e2e trên cả InMemory lẫn PostgreSQL, rồi dựng thử image.
+
 ## Khác biệt so với backend C#
 
 - Truy cập dữ liệu bằng `pg` + SQL tay thay cho EF Core; migration viết bằng TypeScript.
