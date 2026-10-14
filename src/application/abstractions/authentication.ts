@@ -1,4 +1,4 @@
-import { Candidate } from '../../domain';
+import { Candidate, Company } from '../../domain';
 import {
   AccessToken,
   IssuedRefreshToken,
@@ -19,6 +19,17 @@ export abstract class AccountRegistrationRepository {
     account: UserAccount,
     candidate: Candidate,
   ): Promise<boolean>;
+}
+
+export type EmployerRegistrationOutcome =
+  'Created' | 'EmailTaken' | 'CompanyNameTaken';
+
+export abstract class EmployerRegistrationRepository {
+  /** Tạo công ty và tài khoản nhà tuyển dụng trong cùng một giao dịch. */
+  abstract registerEmployer(
+    account: UserAccount,
+    company: Company,
+  ): Promise<EmployerRegistrationOutcome>;
 }
 
 export abstract class AccountSecurityRepository {

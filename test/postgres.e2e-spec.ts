@@ -13,6 +13,15 @@ import {
   SystemClock,
 } from '../src/domain';
 import { JobSearchCriteria } from '../src/application/abstractions/persistence';
+import { CompanyNameAlreadyExistsException } from '../src/application/exceptions';
+import {
+  allMigrations,
+  runMigrations,
+} from '../src/infrastructure/postgres/migrator';
+import {
+  insertCompany,
+  PostgresCompanyRepository,
+} from '../src/infrastructure/postgres/postgres-company-repository';
 import { JobSortOrder } from '../src/application/jobs/dto';
 import { EmailAlreadyExistsException } from '../src/application/exceptions';
 import { InMemoryJobSearchReader } from '../src/infrastructure/persistence/in-memory-job-search-reader';
@@ -24,7 +33,6 @@ import { Pbkdf2PasswordHasher } from '../src/infrastructure/auth/pbkdf2-password
 import { SecureRefreshTokenGenerator } from '../src/infrastructure/auth/secure-refresh-token-generator';
 import { Database } from '../src/infrastructure/postgres/database';
 import { DatabaseInitializer } from '../src/infrastructure/postgres/database-initializer';
-import { runMigrations } from '../src/infrastructure/postgres/migrator';
 import { PostgresCandidateRepository } from '../src/infrastructure/postgres/postgres-candidate-repository';
 import { PostgresJobApplicationRepository } from '../src/infrastructure/postgres/postgres-job-application-repository';
 import { PostgresJobRepository } from '../src/infrastructure/postgres/postgres-job-repository';
@@ -55,6 +63,8 @@ describeWithPostgres('Tầng lưu trữ PostgreSQL', () => {
       hasher,
       JOB_SEED_FILE,
     ).initialize();
+    // Công ty của các tin do makeJob() tạo (mặc định mã 30); khóa ngoại yêu cầu phải tồn tại.
+    await insertCompany(db, new Company(30, 'Công ty 30'));
   }, 60_000);
 
   afterAll(async () => {
@@ -318,6 +328,9 @@ describeWithPostgres('Tìm kiếm tin: PostgreSQL khớp bản in-memory', () =>
     ).initialize();
 
     const jobs = new PostgresJobRepository(db, clock);
+    for (const id of [90, 91, 92]) {
+      await insertCompany(db, new Company(id, `Công ty thử ${id}`));
+    }
     const make = async (
       overrides: Partial<{
         title: string;
@@ -453,6 +466,7 @@ describeWithPostgres('Tìm kiếm tin: PostgreSQL khớp bản in-memory', () =>
     ['kỹ năng không dấu', { skills: ['kubernetes'] }],
     ['lĩnh vực chứa chuỗi', { category: 'backend' }],
     ['cấp bậc', { level: JobLevel.Senior }],
+    ['theo công ty', { companyId: 91 }],
     ['chỉ tin nổi bật', { featured: true }],
     ['chỉ tin thường', { featured: false }],
     ['lương tối thiểu', { minimumSalary: 2500 }],
@@ -529,4 +543,263 @@ describeWithPostgres('Tìm kiếm tin: PostgreSQL khớp bản in-memory', () =>
     expect(items.some((job) => /không hiển thị/.test(job.title))).toBe(false);
     expect(items.length).toBeGreaterThan(5);
   });
+});
+
+describeWithPostgres(
+  'Công ty và đăng ký nhà tuyển dụng trên PostgreSQL',
+  () => {
+    let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
+    let db: Database;
+    const clock = new SystemClock();
+
+    beforeAll(async () => {
+      testDatabase = await createTestDatabase(E2E_POSTGRES_URL!);
+      db = Database.connect(testDatabase.url, 5);
+      await new DatabaseInitializer(
+        db,
+        clock,
+        new Pbkdf2PasswordHasher(),
+        JOB_SEED_FILE,
+      ).initialize();
+    }, 60_000);
+
+    afterAll(async () => {
+      await db.close();
+      await testDatabase.drop();
+    });
+
+    const count = async (table: string) =>
+      Number(
+        (await db.query<{ n: string }>(`SELECT count(*) AS n FROM ${table}`))
+          .rows[0].n,
+      );
+
+    it('seed tạo công ty cho mọi tin và nhà tuyển dụng demo', async () => {
+      const companies = new PostgresCompanyRepository(db);
+
+      expect((await companies.getById(1))!.name).toBe('Nova Technology');
+      expect(await count('companies')).toBe(6);
+      const account = await new PostgresUserAccountRepository(db).findByEmail(
+        'EMPLOYER@jobboard.vn',
+      );
+      expect(account).toMatchObject({
+        companyId: 1,
+        companyName: 'Nova Technology',
+      });
+    });
+
+    it('thêm, đọc, cập nhật công ty; tên trùng (không phân biệt hoa thường) báo lỗi', async () => {
+      const companies = new PostgresCompanyRepository(db);
+      const id = await companies.getNextId();
+      expect(id).toBeGreaterThanOrEqual(100);
+
+      await companies.add(
+        new Company(id, 'Công ty Thử Nghiệm', 'Huế', {
+          website: 'https://thu.vn',
+        }),
+      );
+      const loaded = (await companies.getById(id))!;
+      expect(loaded).toMatchObject({
+        name: 'Công ty Thử Nghiệm',
+        location: 'Huế',
+        website: 'https://thu.vn',
+      });
+
+      await expect(
+        companies.add(
+          new Company(await companies.getNextId(), 'CÔNG TY THỬ NGHIỆM'),
+        ),
+      ).rejects.toBeInstanceOf(CompanyNameAlreadyExistsException);
+
+      loaded.updateProfile({ name: 'Công ty Đổi Tên', description: 'Mô tả' });
+      await companies.update(loaded);
+      expect(await companies.getById(id)).toMatchObject({
+        name: 'Công ty Đổi Tên',
+        description: 'Mô tả',
+      });
+      loaded.updateProfile({ name: 'Nova Technology' });
+      await expect(companies.update(loaded)).rejects.toBeInstanceOf(
+        CompanyNameAlreadyExistsException,
+      );
+    });
+
+    it('đổi hồ sơ công ty đồng bộ bản chụp trong các tin', async () => {
+      const companies = new PostgresCompanyRepository(db);
+      const jobs = new PostgresJobRepository(db, clock);
+      const company = (await companies.getById(2))!;
+
+      company.updateProfile({
+        name: 'Lumi Studio Việt Nam',
+        location: 'Hải Phòng',
+      });
+      await companies.update(company);
+      await jobs.updateCompanySnapshot(company);
+
+      const job = (await jobs.getByCompanyId(2))[0];
+      expect(job.company).toMatchObject({
+        name: 'Lumi Studio Việt Nam',
+        location: 'Hải Phòng',
+      });
+      // Cột tìm kiếm sinh từ tên công ty cũng được cập nhật.
+      const reader = new PostgresJobSearchReader(db, clock);
+      expect(
+        (await reader.search({ ...searchAll, keyword: 'viet nam' })).items.map(
+          (i) => i.id,
+        ),
+      ).toContain(job.id);
+    });
+
+    const searchAll: JobSearchCriteria = {
+      skills: [],
+      sort: JobSortOrder.Newest,
+      page: 1,
+      pageSize: 50,
+    };
+
+    it('đăng ký nhà tuyển dụng tạo công ty + tài khoản trong một giao dịch', async () => {
+      const accounts = new PostgresUserAccountRepository(db);
+      const companies = new PostgresCompanyRepository(db);
+      const make = async (email: string, companyName: string) => {
+        const company = new Company(await companies.getNextId(), companyName);
+        const account = {
+          id: await accounts.getNextUserId(),
+          name: 'Chủ',
+          email,
+          passwordHash: 'hash',
+          role: AccountRole.Employer,
+          companyId: company.id,
+        };
+        return { account, company };
+      };
+
+      const first = await make('chu1@example.com', 'Công ty Một');
+      expect(
+        await accounts.registerEmployer(first.account, first.company),
+      ).toBe('Created');
+      expect(await accounts.findById(first.account.id)).toMatchObject({
+        companyId: first.company.id,
+        companyName: 'Công ty Một',
+      });
+
+      const accountsBefore = await count('user_accounts');
+      const companiesBefore = await count('companies');
+      const sameEmail = await make('CHU1@example.com', 'Công ty Hai');
+      expect(
+        await accounts.registerEmployer(sameEmail.account, sameEmail.company),
+      ).toBe('EmailTaken');
+      const sameCompany = await make('chu3@example.com', 'công ty một');
+      expect(
+        await accounts.registerEmployer(
+          sameCompany.account,
+          sameCompany.company,
+        ),
+      ).toBe('CompanyNameTaken');
+
+      // Thất bại không để lại dòng mồ côi ở bảng nào.
+      expect(await count('user_accounts')).toBe(accountsBefore);
+      expect(await count('companies')).toBe(companiesBefore);
+    });
+
+    it('ràng buộc: chỉ nhà tuyển dụng có company_id và company_id phải tồn tại', async () => {
+      await expect(
+        db.query(
+          `INSERT INTO user_accounts (id, name, email, password_hash, role, company_id)
+         VALUES (990, 'X', 'x990@e.vn', 'h', 'Candidate', 1)`,
+        ),
+      ).rejects.toThrow(/ck_user_accounts_employer_company/);
+      await expect(
+        db.query(
+          `INSERT INTO user_accounts (id, name, email, password_hash, role, company_id)
+         VALUES (991, 'X', 'x991@e.vn', 'h', 'Employer', 123456)`,
+        ),
+      ).rejects.toThrow(/fk_user_accounts_company/);
+    });
+  },
+);
+
+describeWithPostgres('Migration 0003 trên dữ liệu có sẵn', () => {
+  it('chuyển công ty rải rác ở jobs/user_accounts sang bảng companies', async () => {
+    const testDatabase = await createTestDatabase(E2E_POSTGRES_URL!);
+    const db = Database.connect(testDatabase.url, 3);
+    try {
+      // Lược đồ cũ (trước 0003) với dữ liệu thật.
+      await runMigrations(db, allMigrations.slice(0, 2));
+      const insertJobRow = (
+        id: number,
+        companyId: number,
+        companyName: string,
+      ) =>
+        db.query(
+          `INSERT INTO jobs (id, title, company_id, company_name, company_location, salary_min, salary_max,
+             deadline, location, level, work_mode, category, summary, description, requirements, benefits,
+             posted_at, featured, status, skills)
+           VALUES ($1, $2, $3, $4, 'Hà Nội', 1, 2, now() + interval '5 day', 'HN', 'Middle', 'Onsite', 'IT', '',
+             '{}', '{}', '{}', now(), false, 'Published', '{}')`,
+          [id, `Tin ${id}`, companyId, companyName],
+        );
+      await insertJobRow(1, 1, 'Nova');
+      await insertJobRow(2, 2, 'Lumi');
+      await insertJobRow(3, 2, 'Lumi');
+      await insertJobRow(4, 5, 'NOVA'); // trùng tên với công ty 1 (khác hoa thường)
+      const insertAccount = (
+        id: number,
+        role: string,
+        companyId: number | null,
+        companyName: string | null,
+      ) =>
+        db.query(
+          `INSERT INTO user_accounts (id, name, email, password_hash, role, company_id, company_name)
+           VALUES ($1, 'A', $2, 'h', $3, $4, $5)`,
+          [id, `a${id}@e.vn`, role, companyId, companyName],
+        );
+      await insertAccount(1, 'Employer', 1, 'Nova');
+      await insertAccount(2, 'Employer', 7, 'Công ty mồ côi'); // không có tin nào
+      await insertAccount(3, 'Candidate', null, null);
+
+      const applied = await runMigrations(db);
+
+      expect(applied).toEqual(['0003_companies']);
+      const { rows } = await db.query<{
+        id: number;
+        name: string;
+        location: string | null;
+      }>('SELECT id, name, location FROM companies ORDER BY id');
+      expect(rows).toEqual([
+        { id: 1, name: 'Nova', location: 'Hà Nội' },
+        { id: 2, name: 'Lumi', location: 'Hà Nội' },
+        { id: 5, name: 'NOVA (#5)', location: 'Hà Nội' },
+        { id: 7, name: 'Công ty mồ côi', location: null },
+      ]);
+      // Tên bản chụp trong tin được đồng bộ theo công ty đã sửa tên trùng.
+      expect(
+        (await db.query('SELECT company_name FROM jobs WHERE id = 4')).rows[0],
+      ).toEqual({
+        company_name: 'NOVA (#5)',
+      });
+      expect(
+        await db
+          .query<{ n: string }>("SELECT currval('company_ids') AS n")
+          .catch(() => null),
+      ).toBeNull();
+      expect(
+        (
+          await db.query<{ id: number }>(
+            "SELECT nextval('company_ids')::integer AS id",
+          )
+        ).rows[0].id,
+      ).toBe(100);
+      // Cột tên công ty ở tài khoản đã bị bỏ; tên đọc qua JOIN.
+      const account = await new PostgresUserAccountRepository(db).findById(2);
+      expect(account).toMatchObject({
+        companyId: 7,
+        companyName: 'Công ty mồ côi',
+      });
+      await expect(insertJobRow(9, 12345, 'Không có')).rejects.toThrow(
+        /fk_jobs_company/,
+      );
+    } finally {
+      await db.close();
+      await testDatabase.drop();
+    }
+  }, 60_000);
 });

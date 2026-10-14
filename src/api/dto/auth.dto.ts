@@ -1,4 +1,4 @@
-import { IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { AccountRole } from '../../application/auth';
 
 export class LoginDto {
@@ -11,6 +11,17 @@ export class RegisterCandidateDto {
   @IsString() @MaxLength(320) email!: string;
   /** Tối thiểu 10 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt. */
   @IsString() @MaxLength(128) password!: string;
+}
+
+export class RegisterEmployerDto {
+  /** Tên người đại diện/quản lý tài khoản. */
+  @IsString() @MaxLength(160) name!: string;
+  @IsString() @MaxLength(320) email!: string;
+  /** Tối thiểu 10 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt. */
+  @IsString() @MaxLength(128) password!: string;
+  /** Tên công ty phải chưa được đăng ký (không phân biệt hoa thường). */
+  @IsString() @MaxLength(200) companyName!: string;
+  @IsOptional() @IsString() @MaxLength(200) companyLocation?: string;
 }
 
 export class RefreshTokenDto {

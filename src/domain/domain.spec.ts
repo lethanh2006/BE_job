@@ -4,6 +4,7 @@ import {
   Candidate,
   Clock,
   Company,
+  CompanyStatus,
   Employer,
   InvalidJobStateException,
   Job,
@@ -162,6 +163,79 @@ describe('Job.update', () => {
     );
     expect(() => job.update(content(), tooMany)).toThrow(ArgumentError);
     expect(job.title).toBe('Backend');
+  });
+});
+
+describe('Company', () => {
+  it('chuẩn hóa và kiểm tra hồ sơ', () => {
+    const company = new Company(1, '  Nova  ', ' Hà Nội ', {
+      website: ' https://nova.vn ',
+      description: '  Giới thiệu ',
+    });
+
+    expect(company).toMatchObject({
+      name: 'Nova',
+      location: 'Hà Nội',
+      website: 'https://nova.vn',
+      description: 'Giới thiệu',
+      status: CompanyStatus.Active,
+    });
+  });
+
+  it('bỏ trống trường tùy chọn thành undefined', () => {
+    const company = new Company(1, 'Nova', '  ', {
+      website: '',
+      description: null,
+    });
+
+    expect(company.location).toBeUndefined();
+    expect(company.website).toBeUndefined();
+    expect(company.description).toBeUndefined();
+  });
+
+  it.each([
+    ['tên rỗng', () => new Company(1, '  ')],
+    ['tên quá dài', () => new Company(1, 'x'.repeat(201))],
+    [
+      'website không phải http(s)',
+      () => new Company(1, 'Nova', null, { website: 'ftp://nova.vn' }),
+    ],
+    [
+      'website không phải URL',
+      () => new Company(1, 'Nova', null, { website: 'nova.vn' }),
+    ],
+    [
+      'giới thiệu quá dài',
+      () => new Company(1, 'Nova', null, { description: 'x'.repeat(4001) }),
+    ],
+  ])('từ chối %s', (_name, create) => {
+    expect(create).toThrow(ArgumentError);
+  });
+
+  it('updateProfile thay toàn bộ và giữ nguyên hồ sơ cũ nếu dữ liệu sai', () => {
+    const company = new Company(1, 'Nova', 'HN', {
+      website: 'https://nova.vn',
+    });
+
+    company.updateProfile({ name: 'Nova Group' });
+    expect(company).toMatchObject({ name: 'Nova Group' });
+    expect(company.location).toBeUndefined();
+    expect(company.website).toBeUndefined();
+
+    expect(() => company.updateProfile({ name: '' })).toThrow(ArgumentError);
+    expect(company.name).toBe('Nova Group');
+  });
+});
+
+describe('Job.refreshCompany', () => {
+  it('cập nhật bản chụp công ty nhưng không cho đổi sang công ty khác', () => {
+    const job = makeJob(1);
+    job.refreshCompany(new Company(1, 'Tên mới'));
+
+    expect(job.company?.name).toBe('Tên mới');
+    expect(() => job.refreshCompany(new Company(2, 'Khác'))).toThrow(
+      ArgumentError,
+    );
   });
 });
 

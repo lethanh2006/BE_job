@@ -29,6 +29,7 @@ import {
   LoginResultResponseDto,
   RefreshTokenDto,
   RegisterCandidateDto,
+  RegisterEmployerDto,
 } from '../dto/auth.dto';
 import { AuthPrincipal, CurrentUser, JwtAuthGuard } from '../auth/auth';
 
@@ -65,6 +66,18 @@ export class AuthController {
       body.email,
       body.password,
     );
+  }
+
+  @Post('register/employer')
+  @ApiOperation({
+    summary: 'Đăng ký nhà tuyển dụng',
+    description:
+      'Tạo công ty mới cùng tài khoản quản lý công ty đó rồi cấp phiên đăng nhập đầu tiên.',
+  })
+  @ApiCreatedResponse({ type: LoginResultResponseDto })
+  @ApiProblems(HttpStatus.BAD_REQUEST, HttpStatus.CONFLICT)
+  registerEmployer(@Body() body: RegisterEmployerDto) {
+    return this.registrationService.registerEmployer(body);
   }
 
   @Post('refresh')

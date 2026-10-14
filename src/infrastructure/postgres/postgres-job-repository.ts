@@ -1,4 +1,4 @@
-import { Clock, Job } from '../../domain';
+import { Clock, Company, Job } from '../../domain';
 import { JobRepository } from '../../application/abstractions/persistence';
 import { Database, Queryable } from './database';
 import { JobRow, jobColumns, toJob } from './row-mapper';
@@ -45,6 +45,13 @@ export class PostgresJobRepository extends JobRepository {
       [companyId],
     );
     return rows.map((row) => toJob(row, this.clock));
+  }
+
+  async updateCompanySnapshot(company: Company): Promise<void> {
+    await this.db.query(
+      'UPDATE jobs SET company_name = $2, company_location = $3 WHERE company_id = $1',
+      [company.id, company.name, company.location ?? null],
+    );
   }
 
   async getNextId(): Promise<number> {

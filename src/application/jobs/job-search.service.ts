@@ -39,6 +39,7 @@ export class JobSearchService {
       level: query.level ?? undefined,
       minimumSalary: query.minimumSalary ?? undefined,
       featured: query.featured ?? undefined,
+      companyId: query.companyId ?? undefined,
       skills,
       sort: query.sort ?? JobSortOrder.Newest,
       page,

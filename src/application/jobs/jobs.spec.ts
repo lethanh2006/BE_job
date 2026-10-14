@@ -1,5 +1,10 @@
-import { JobLevel, JobManagementForbiddenException } from '../../domain';
+import {
+  CompanyStatus,
+  JobLevel,
+  JobManagementForbiddenException,
+} from '../../domain';
 import { Company, Employer, Skill, JobStatus } from '../../domain';
+import { InMemoryCompanyRepository } from '../../infrastructure/persistence/in-memory-company-repository';
 import { InMemoryJobSearchReader } from '../../infrastructure/persistence/in-memory-job-search-reader';
 import { InMemoryJobApplicationRepository } from '../../infrastructure/persistence/in-memory-job-application-repository';
 import {
@@ -243,22 +248,24 @@ describe('JobManagementService', () => {
       new Company(companyId, `Công ty ${companyId}`),
     );
 
-  function setup() {
+  async function setup() {
     const jobs = new FakeJobRepository();
     const applications = new InMemoryJobApplicationRepository();
+    const companies = new InMemoryCompanyRepository();
+    await companies.add(new Company(30, 'ABC', 'Hà Nội'));
     return {
       jobs,
       applications,
-      service: new JobManagementService(jobs, applications, clock),
+      companies,
+      service: new JobManagementService(jobs, applications, companies, clock),
     };
   }
 
   it('tạo bản nháp có kỹ năng, chưa hiển thị trong danh sách đang tuyển', async () => {
-    const { jobs, service } = setup();
+    const { jobs, service } = await setup();
 
     const created = await service.createDraft({
       companyId: 30,
-      companyName: 'ABC',
       title: 'Dev',
       location: 'HN',
       salaryMin: 1,
@@ -277,8 +284,39 @@ describe('JobManagementService', () => {
     );
   });
 
+  it('công ty bị khóa không tạo hoặc đăng tin được; công ty không tồn tại báo 404', async () => {
+    const { jobs, companies, service } = await setup();
+    await companies.add(
+      new Company(40, 'Bị khóa', null, { status: CompanyStatus.Suspended }),
+    );
+    jobs.seed(makeJob(clock, { id: 5, companyId: 40, publish: false }));
+    const base = {
+      title: 'Dev',
+      location: 'HN',
+      salaryMin: 1,
+      salaryMax: 2,
+      deadline: new Date(clock.utcNow.getTime() + 86_400_000),
+      level: JobLevel.Junior,
+      workMode: 'Remote' as never,
+      category: 'IT',
+      summary: 's',
+      skills: [],
+    };
+
+    await expect(
+      service.createDraft({ ...base, companyId: 40 }),
+    ).rejects.toBeInstanceOf(JobManagementForbiddenException);
+    await expect(
+      service.createDraft({ ...base, companyId: 99 }),
+    ).rejects.toBeInstanceOf(ResourceNotFoundException);
+    await expect(service.publish(5, employerOf(40))).rejects.toBeInstanceOf(
+      JobManagementForbiddenException,
+    );
+    expect((await jobs.getById(5))!.status).toBe(JobStatus.Draft);
+  });
+
   it('chỉ employer đúng công ty được đăng/đóng tin', async () => {
-    const { jobs, service } = setup();
+    const { jobs, service } = await setup();
     jobs.seed(makeJob(clock, { id: 1, companyId: 30, publish: false }));
 
     await expect(service.publish(1, employerOf(99))).rejects.toBeInstanceOf(
@@ -321,7 +359,9 @@ describe('JobManagementService - xem và sửa tin', () => {
     skills: ['AWS', 'aws', 'K8s'],
   };
 
-  function setup() {
+  async function setup() {
+    const companies = new InMemoryCompanyRepository();
+    await companies.add(new Company(30, 'ABC'));
     const jobs = new FakeJobRepository().seed(
       makeJob(clock, { id: 1, companyId: 30, publish: false, skills: ['Cũ'] }),
     );
@@ -330,13 +370,14 @@ describe('JobManagementService - xem và sửa tin', () => {
       service: new JobManagementService(
         jobs,
         new InMemoryJobApplicationRepository(),
+        companies,
         clock,
       ),
     };
   }
 
   it('thay toàn bộ nội dung, lưu lại và trả chi tiết đầy đủ', async () => {
-    const { jobs, service } = setup();
+    const { jobs, service } = await setup();
 
     const detail = await service.update(1, employerOf(30), command);
 
@@ -354,7 +395,7 @@ describe('JobManagementService - xem và sửa tin', () => {
   });
 
   it('chỉ công ty sở hữu được xem/sửa; tin không tồn tại báo 404', async () => {
-    const { service } = setup();
+    const { service } = await setup();
 
     await expect(
       service.update(1, employerOf(99), command),
@@ -371,7 +412,7 @@ describe('JobManagementService - xem và sửa tin', () => {
   });
 
   it('tin đã đóng không sửa được', async () => {
-    const { service } = setup();
+    const { service } = await setup();
     await service.publish(1, employerOf(30));
     await service.close(1, employerOf(30));
 

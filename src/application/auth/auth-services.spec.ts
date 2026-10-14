@@ -2,12 +2,15 @@ import { ArgumentError, Clock } from '../../domain';
 import { Pbkdf2PasswordHasher } from '../../infrastructure/auth/pbkdf2-password-hasher';
 import { SecureRefreshTokenGenerator } from '../../infrastructure/auth/secure-refresh-token-generator';
 import { InMemoryCandidateRepository } from '../../infrastructure/persistence/in-memory-candidate-repository';
+import { InMemoryCompanyRepository } from '../../infrastructure/persistence/in-memory-company-repository';
+import { JOB_SEED_FILE } from '../../infrastructure/seed/paths';
 import { InMemoryRefreshTokenRepository } from '../../infrastructure/persistence/in-memory-refresh-token-repository';
 import { InMemoryUserAccountRepository } from '../../infrastructure/persistence/in-memory-user-account-repository';
 import { MutableClock } from '../../testing/test-helpers';
 import { AccessTokenGenerator } from '../abstractions/authentication';
 import {
   CurrentPasswordIncorrectException,
+  CompanyNameAlreadyExistsException,
   EmailAlreadyExistsException,
   InvalidCredentialsException,
   InvalidRefreshTokenException,
@@ -34,9 +37,11 @@ async function createSystem() {
   const clock = new MutableClock();
   const hasher = new Pbkdf2PasswordHasher();
   const candidates = new InMemoryCandidateRepository();
+  const companies = new InMemoryCompanyRepository(JOB_SEED_FILE);
   const accounts = await InMemoryUserAccountRepository.createWithDemoData(
     hasher,
     candidates,
+    companies,
   );
   const refreshTokens = new InMemoryRefreshTokenRepository();
   const refreshGenerator = new SecureRefreshTokenGenerator(
@@ -49,6 +54,7 @@ async function createSystem() {
     clock,
     hasher,
     candidates,
+    companies,
     accounts,
     refreshTokens,
     refreshGenerator,
@@ -68,6 +74,8 @@ async function createSystem() {
     ),
     registration: new RegistrationService(
       accounts,
+      accounts,
+      companies,
       hasher,
       accessTokens,
       refreshGenerator,
@@ -254,6 +262,96 @@ describe('RegistrationService', () => {
     await expect(
       registration.registerCandidate('  ', 'a@b.co', 'Mat-khau-1234'),
     ).rejects.toBeInstanceOf(ArgumentError);
+  });
+});
+
+describe('RegistrationService - nhà tuyển dụng', () => {
+  const command = {
+    name: ' Lê Chủ ',
+    email: ' Chu@Cong-Ty.vn ',
+    password: 'Mat-khau-1234',
+    companyName: ' Công ty Mới ',
+    companyLocation: ' Huế ',
+  };
+
+  it('tạo công ty và tài khoản quản lý, cấp phiên đăng nhập', async () => {
+    const { registration, companies, accounts, login } = await createSystem();
+
+    const result = await registration.registerEmployer(command);
+
+    expect(result.user).toMatchObject({
+      name: 'Lê Chủ',
+      email: 'chu@cong-ty.vn',
+      role: AccountRole.Employer,
+      companyName: 'Công ty Mới',
+    });
+    const company = (await companies.getById(result.user.companyId!))!;
+    expect(company).toMatchObject({ name: 'Công ty Mới', location: 'Huế' });
+    expect(company.id).toBeGreaterThanOrEqual(100);
+    expect((await accounts.findByEmail('chu@cong-ty.vn'))!.companyId).toBe(
+      company.id,
+    );
+    await expect(
+      login.login('chu@cong-ty.vn', 'Mat-khau-1234'),
+    ).resolves.toBeDefined();
+  });
+
+  it('email hoặc tên công ty trùng (không phân biệt hoa thường) trả lỗi xung đột', async () => {
+    const { registration } = await createSystem();
+
+    await expect(
+      registration.registerEmployer({
+        ...command,
+        email: 'EMPLOYER@jobboard.vn',
+      }),
+    ).rejects.toBeInstanceOf(EmailAlreadyExistsException);
+    await expect(
+      registration.registerEmployer({
+        ...command,
+        companyName: 'NOVA technology',
+      }),
+    ).rejects.toBeInstanceOf(CompanyNameAlreadyExistsException);
+
+    // Lần đăng ký thất bại không để lại tài khoản mồ côi: dùng lại email vẫn đăng ký được.
+    await expect(registration.registerEmployer(command)).resolves.toBeDefined();
+    await expect(
+      registration.registerEmployer({
+        ...command,
+        companyName: 'Công ty khác',
+      }),
+    ).rejects.toBeInstanceOf(EmailAlreadyExistsException);
+  });
+
+  it('từ chối dữ liệu không hợp lệ', async () => {
+    const { registration } = await createSystem();
+
+    await expect(
+      registration.registerEmployer({ ...command, companyName: '  ' }),
+    ).rejects.toBeInstanceOf(ArgumentError);
+    await expect(
+      registration.registerEmployer({
+        ...command,
+        companyName: 'x'.repeat(201),
+      }),
+    ).rejects.toBeInstanceOf(ArgumentError);
+    await expect(
+      registration.registerEmployer({ ...command, password: 'yeu' }),
+    ).rejects.toBeInstanceOf(ArgumentError);
+    await expect(
+      registration.registerEmployer({ ...command, email: 'khong-hop-le' }),
+    ).rejects.toBeInstanceOf(ArgumentError);
+  });
+
+  it('đăng nhập nhà tuyển dụng demo trả tên công ty lấy từ hồ sơ công ty', async () => {
+    const { login, companies } = await createSystem();
+    (await companies.getById(1))!.updateProfile({ name: 'Nova Group' });
+
+    const result = await login.login('employer@jobboard.vn', PASSWORD);
+
+    expect(result.user).toMatchObject({
+      companyId: 1,
+      companyName: 'Nova Group',
+    });
   });
 });
 

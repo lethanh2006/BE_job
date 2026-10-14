@@ -3,6 +3,7 @@ import {
   Candidate,
   Clock,
   Company,
+  CompanyStatus,
   Job,
   JobApplication,
   JobLevel,
@@ -69,6 +70,15 @@ export interface UserAccountRow {
   company_name: string | null;
 }
 
+export interface CompanyRow {
+  id: number;
+  name: string;
+  location: string | null;
+  website: string | null;
+  description: string | null;
+  status: CompanyStatus;
+}
+
 export interface RefreshTokenRow {
   id: string;
   user_id: number;
@@ -78,6 +88,14 @@ export interface RefreshTokenRow {
   expires_at: Date;
   revoked_at: Date | null;
   replaced_by_token_hash: string | null;
+}
+
+export function toCompany(row: CompanyRow): Company {
+  return new Company(row.id, row.name, row.location, {
+    website: row.website,
+    description: row.description,
+    status: row.status,
+  });
 }
 
 export function toJob(row: JobRow, clock: Clock): Job {

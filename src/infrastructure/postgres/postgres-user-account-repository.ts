@@ -1,11 +1,17 @@
-import { Candidate } from '../../domain';
+import { Candidate, Company } from '../../domain';
 import {
   AccountRegistrationRepository,
   AccountSecurityRepository,
+  EmployerRegistrationOutcome,
+  EmployerRegistrationRepository,
   UserAccountRepository,
 } from '../../application/abstractions/authentication';
 import { UserAccount } from '../../application/auth';
 import { insertCandidate } from './postgres-candidate-repository';
+import {
+  COMPANY_NAME_INDEX,
+  insertCompany,
+} from './postgres-company-repository';
 import { Database, isPgError, PgErrorCode, Queryable } from './database';
 import { toUserAccount, UserAccountRow } from './row-mapper';
 
@@ -14,13 +20,14 @@ export class PostgresUserAccountRepository
   implements
     UserAccountRepository,
     AccountRegistrationRepository,
+    EmployerRegistrationRepository,
     AccountSecurityRepository
 {
   constructor(private readonly db: Database) {}
 
   async findById(id: number): Promise<UserAccount | null> {
     const { rows } = await this.db.query<UserAccountRow>(
-      'SELECT * FROM user_accounts WHERE id = $1',
+      `${SELECT_ACCOUNT} WHERE a.id = $1`,
       [id],
     );
     return rows[0] ? toUserAccount(rows[0]) : null;
@@ -28,7 +35,7 @@ export class PostgresUserAccountRepository
 
   async findByEmail(normalizedEmail: string): Promise<UserAccount | null> {
     const { rows } = await this.db.query<UserAccountRow>(
-      'SELECT * FROM user_accounts WHERE lower(email) = lower($1)',
+      `${SELECT_ACCOUNT} WHERE lower(a.email) = lower($1)`,
       [normalizedEmail],
     );
     return rows[0] ? toUserAccount(rows[0]) : null;
@@ -66,6 +73,28 @@ export class PostgresUserAccountRepository
     }
   }
 
+  /** Tạo công ty và tài khoản nhà tuyển dụng trong cùng một giao dịch. */
+  async registerEmployer(
+    account: UserAccount,
+    company: Company,
+  ): Promise<EmployerRegistrationOutcome> {
+    try {
+      await this.db.transaction(async (tx) => {
+        await insertCompany(tx, company);
+        await insertAccount(tx, account);
+      });
+      return 'Created';
+    } catch (error) {
+      if (isPgError(error, PgErrorCode.UniqueViolation)) {
+        return (error as { constraint?: string }).constraint ===
+          COMPANY_NAME_INDEX
+          ? 'CompanyNameTaken'
+          : 'EmailTaken';
+      }
+      throw error;
+    }
+  }
+
   async tryUpdatePasswordHash(
     userId: number,
     expectedPasswordHash: string,
@@ -79,14 +108,18 @@ export class PostgresUserAccountRepository
   }
 }
 
+/** Tên công ty đọc qua JOIN: chỉ có một nguồn là bảng companies. */
+const SELECT_ACCOUNT = `
+  SELECT a.id, a.name, a.email, a.password_hash, a.role, a.company_id, c.name AS company_name
+    FROM user_accounts a LEFT JOIN companies c ON c.id = a.company_id`;
+
 export async function insertAccount(
   db: Queryable,
   account: UserAccount,
 ): Promise<void> {
   await db.query(
-    `INSERT INTO user_accounts
-       (id, name, email, password_hash, role, company_id, company_name)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    `INSERT INTO user_accounts (id, name, email, password_hash, role, company_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
     [
       account.id,
       account.name,
@@ -94,7 +127,6 @@ export async function insertAccount(
       account.passwordHash,
       account.role,
       account.companyId ?? null,
-      account.companyName ?? null,
     ],
   );
 }

@@ -214,6 +214,167 @@ describe.each(backends)('JobBoard API (e2e) — $name', (backend) => {
     });
   });
 
+  describe('nhà tuyển dụng đăng ký và hồ sơ công ty', () => {
+    const unique = Date.now();
+    const registration = {
+      name: 'Chủ mới',
+      email: `chu.${unique}@example.com`,
+      password: 'Mat-khau-1234',
+      companyName: `Công ty E2E ${unique}`,
+      companyLocation: 'Cần Thơ',
+    };
+    let token: string;
+    let companyId: number;
+
+    it('đăng ký tạo công ty và tài khoản quản lý, đăng nhập được', async () => {
+      const res = await http()
+        .post('/api/auth/register/employer')
+        .send(registration)
+        .expect(201);
+
+      expect(res.body.user).toMatchObject({
+        role: 'Employer',
+        companyName: registration.companyName,
+      });
+      companyId = res.body.user.companyId;
+      token = res.body.accessToken;
+      expect(companyId).toBeGreaterThanOrEqual(100);
+      const relogin = await login(registration.email, registration.password);
+      expect(relogin.status).toBe(200);
+    });
+
+    it('email hoặc tên công ty trùng → 409; dữ liệu sai → 400', async () => {
+      await http()
+        .post('/api/auth/register/employer')
+        .send({ ...registration, companyName: 'Tên khác hẳn' })
+        .expect(409);
+      const duplicateName = await http()
+        .post('/api/auth/register/employer')
+        .send({
+          ...registration,
+          email: `khac.${unique}@example.com`,
+          companyName: registration.companyName.toUpperCase(),
+        })
+        .expect(409);
+      expect(duplicateName.body.title).toBe('Tên công ty đã tồn tại');
+      await http()
+        .post('/api/auth/register/employer')
+        .send({
+          ...registration,
+          email: `y.${unique}@example.com`,
+          password: 'yeu',
+        })
+        .expect(400);
+      await http()
+        .post('/api/auth/register/employer')
+        .send({
+          ...registration,
+          email: `z.${unique}@example.com`,
+          companyName: '',
+        })
+        .expect(400);
+    });
+
+    it('tạo và đăng tin; tin hiển thị công khai kèm công ty, lọc được theo companyId', async () => {
+      const created = await http()
+        .post(`/api/employers/${companyId}/jobs`)
+        .set(bearer(token))
+        .send({
+          title: 'Tin của công ty mới',
+          location: 'Cần Thơ',
+          salaryMin: 500,
+          salaryMax: 900,
+          deadline: '2099-01-01T00:00:00Z',
+          level: 'Junior',
+          workMode: 'Onsite',
+          category: 'Kinh doanh',
+          summary: 'Tóm tắt',
+          skills: [],
+        })
+        .expect(201);
+      await http()
+        .post(`/api/employers/${companyId}/jobs/${created.body.id}/publish`)
+        .set(bearer(token))
+        .expect(200);
+
+      const byCompany = await http()
+        .get(`/api/jobs?companyId=${companyId}`)
+        .expect(200);
+      expect(byCompany.body.items).toHaveLength(1);
+      expect(byCompany.body.items[0]).toMatchObject({
+        title: 'Tin của công ty mới',
+        companyId,
+        company: registration.companyName,
+      });
+    });
+
+    it('hồ sơ công ty: xem công khai, chủ sở hữu sửa, tên mới đồng bộ vào tin và đăng nhập', async () => {
+      await http()
+        .get(`/api/companies/${companyId}`)
+        .expect(200)
+        .then((res) =>
+          expect(res.body).toMatchObject({
+            id: companyId,
+            location: 'Cần Thơ',
+            website: null,
+          }),
+        );
+
+      const newName = `${registration.companyName} Mới`;
+      await http()
+        .put(`/api/employers/${companyId}/company`)
+        .set(bearer(token))
+        .send({
+          name: newName,
+          location: 'Hà Nội',
+          website: 'https://example.com',
+          description: 'Giới thiệu công ty',
+        })
+        .expect(200);
+
+      const jobs = await http()
+        .get(`/api/jobs?companyId=${companyId}`)
+        .expect(200);
+      expect(jobs.body.items[0].company).toBe(newName);
+      const search = await http()
+        .get(`/api/jobs?keyword=${encodeURIComponent('công ty e2e')}`)
+        .expect(200);
+      expect(
+        search.body.items.some(
+          (job: { companyId: number }) => job.companyId === companyId,
+        ),
+      ).toBe(true);
+      const relogin = await login(registration.email, registration.password);
+      expect(relogin.body.user.companyName).toBe(newName);
+    });
+
+    it('không sửa được công ty của người khác; dữ liệu sai → 400; trùng tên → 409', async () => {
+      const demo = (await login('employer@jobboard.vn')).body.accessToken;
+
+      await http()
+        .put(`/api/employers/${companyId}/company`)
+        .set(bearer(demo))
+        .send({ name: 'Chiếm quyền' })
+        .expect(403);
+      await http()
+        .get(`/api/employers/${companyId}/company`)
+        .set(bearer(demo))
+        .expect(403);
+      await http()
+        .put(`/api/employers/${companyId}/company`)
+        .set(bearer(token))
+        .send({ name: 'Công ty', website: 'ftp://example.com' })
+        .expect(400);
+      await http()
+        .put(`/api/employers/${companyId}/company`)
+        .set(bearer(token))
+        .send({ name: 'nova technology' })
+        .expect(409);
+      await http().get('/api/companies/9999').expect(404);
+      await http().get('/api/companies/abc').expect(404);
+    });
+  });
+
   describe('ứng viên', () => {
     let token: string;
     beforeAll(async () => {

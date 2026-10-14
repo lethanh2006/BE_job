@@ -73,7 +73,6 @@ export async function createDemoAccounts(
       passwordHash,
       role: AccountRole.Employer,
       companyId: 1,
-      companyName: 'Nova Technology',
     },
     {
       id: 100,

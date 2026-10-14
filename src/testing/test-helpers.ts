@@ -90,6 +90,13 @@ export class FakeJobRepository extends JobRepository {
     );
   }
 
+  updateCompanySnapshot(company: Company): Promise<void> {
+    this.jobs.forEach((job) => {
+      if (job.companyId === company.id) job.refreshCompany(company);
+    });
+    return Promise.resolve();
+  }
+
   getNextId(): Promise<number> {
     return Promise.resolve(Math.max(0, ...this.jobs.keys()) + 1);
   }

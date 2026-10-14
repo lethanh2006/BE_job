@@ -1,32 +1,43 @@
-import { Candidate } from '../../domain';
+import { Candidate, Company } from '../../domain';
 import {
   AccountRegistrationRepository,
   AccountSecurityRepository,
+  EmployerRegistrationOutcome,
+  EmployerRegistrationRepository,
   PasswordHasher,
   UserAccountRepository,
 } from '../../application/abstractions/authentication';
-import { CandidateRepository } from '../../application/abstractions/persistence';
+import {
+  CandidateRepository,
+  CompanyRepository,
+} from '../../application/abstractions/persistence';
+import { CompanyNameAlreadyExistsException } from '../../application/exceptions';
 import { UserAccount } from '../../application/auth';
 import { createDemoAccounts } from '../seed/demo-data';
 
-/** Một lớp triển khai cả 3 abstraction về tài khoản (đọc, đăng ký, bảo mật). */
+/** Một lớp triển khai các abstraction về tài khoản (đọc, đăng ký ứng viên/nhà tuyển dụng, bảo mật). */
 export class InMemoryUserAccountRepository
   implements
     UserAccountRepository,
     AccountRegistrationRepository,
+    EmployerRegistrationRepository,
     AccountSecurityRepository
 {
   private readonly accounts = new Map<string, UserAccount>();
   private lastId = 0;
 
-  private constructor(private readonly candidates: CandidateRepository) {}
+  private constructor(
+    private readonly candidates: CandidateRepository,
+    private readonly companies: CompanyRepository,
+  ) {}
 
   /** Tạo repository kèm 3 tài khoản demo (candidate / employer / admin). */
   static async createWithDemoData(
     passwordHasher: PasswordHasher,
     candidates: CandidateRepository,
+    companies: CompanyRepository,
   ): Promise<InMemoryUserAccountRepository> {
-    const repository = new InMemoryUserAccountRepository(candidates);
+    const repository = new InMemoryUserAccountRepository(candidates, companies);
     const demoAccounts = await createDemoAccounts(passwordHasher);
 
     demoAccounts.forEach((account) =>
@@ -37,15 +48,15 @@ export class InMemoryUserAccountRepository
     return repository;
   }
 
-  findByEmail(normalizedEmail: string): Promise<UserAccount | null> {
-    return Promise.resolve(
-      this.accounts.get(normalizedEmail.toLowerCase()) ?? null,
+  async findByEmail(normalizedEmail: string): Promise<UserAccount | null> {
+    return this.withCompanyName(
+      this.accounts.get(normalizedEmail.toLowerCase()),
     );
   }
 
-  findById(id: number): Promise<UserAccount | null> {
-    return Promise.resolve(
-      [...this.accounts.values()].find((account) => account.id === id) ?? null,
+  async findById(id: number): Promise<UserAccount | null> {
+    return this.withCompanyName(
+      [...this.accounts.values()].find((account) => account.id === id),
     );
   }
 
@@ -74,6 +85,27 @@ export class InMemoryUserAccountRepository
     }
   }
 
+  async registerEmployer(
+    account: UserAccount,
+    company: Company,
+  ): Promise<EmployerRegistrationOutcome> {
+    const key = account.email.toLowerCase();
+    if (this.accounts.has(key)) return 'EmailTaken';
+
+    // Giữ chỗ email ngay (không có await giữa kiểm tra và ghi) rồi mới tạo công ty.
+    this.accounts.set(key, { ...account, companyId: company.id });
+    try {
+      await this.companies.add(company);
+      return 'Created';
+    } catch (error) {
+      this.accounts.delete(key);
+      if (error instanceof CompanyNameAlreadyExistsException) {
+        return 'CompanyNameTaken';
+      }
+      throw error;
+    }
+  }
+
   tryUpdatePasswordHash(
     userId: number,
     expectedPasswordHash: string,
@@ -89,5 +121,16 @@ export class InMemoryUserAccountRepository
       passwordHash: newPasswordHash,
     });
     return Promise.resolve(true);
+  }
+
+  /** Tên công ty luôn lấy từ repository công ty để đổi tên có hiệu lực ngay. */
+  private async withCompanyName(
+    account: UserAccount | undefined,
+  ): Promise<UserAccount | null> {
+    if (!account) return null;
+    if (account.companyId == null) return account;
+
+    const company = await this.companies.getById(account.companyId);
+    return { ...account, companyName: company?.name ?? null };
   }
 }

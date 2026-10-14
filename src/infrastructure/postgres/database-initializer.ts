@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Clock } from '../../domain';
 import { PasswordHasher } from '../../application/abstractions/authentication';
 import { InMemoryJobRepository } from '../persistence/in-memory-job-repository';
+import { loadSeedCompanies } from '../seed/seed-companies';
 import {
   createDemoAccounts,
   createDemoApplications,
@@ -10,6 +11,7 @@ import {
 import { Database } from './database';
 import { runMigrations } from './migrator';
 import { insertCandidate } from './postgres-candidate-repository';
+import { insertCompany } from './postgres-company-repository';
 import { insertApplication } from './postgres-job-application-repository';
 import { insertJob } from './postgres-job-repository';
 import { insertAccount } from './postgres-user-account-repository';
@@ -41,6 +43,7 @@ export class DatabaseInitializer implements OnModuleInit {
 
   private async seedIfEmpty(): Promise<void> {
     const demoAccounts = await createDemoAccounts(this.passwordHasher);
+    const seedCompanies = await loadSeedCompanies(this.jobSeedFilePath);
     const seedJobs = await new InMemoryJobRepository(
       this.jobSeedFilePath,
       this.clock,
@@ -50,6 +53,9 @@ export class DatabaseInitializer implements OnModuleInit {
       const isEmpty = async (table: string) =>
         (await tx.query(`SELECT 1 FROM ${table} LIMIT 1`)).rows.length === 0;
 
+      if (await isEmpty('companies')) {
+        for (const company of seedCompanies) await insertCompany(tx, company);
+      }
       if (await isEmpty('jobs')) {
         for (const job of seedJobs) await insertJob(tx, job);
       }

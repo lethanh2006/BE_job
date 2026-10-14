@@ -73,6 +73,7 @@ function matches(job: Job, c: JobSearchCriteria): boolean {
     (!c.location || includesFolded(job.location, c.location)) &&
     (!c.category || includesFolded(job.category, c.category)) &&
     (c.level === undefined || job.level === c.level) &&
-    (c.featured === undefined || job.featured === c.featured)
+    (c.featured === undefined || job.featured === c.featured) &&
+    (c.companyId === undefined || job.companyId === c.companyId)
   );
 }

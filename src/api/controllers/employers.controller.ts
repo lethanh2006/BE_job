@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -18,6 +17,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { CompanyService } from '../../application/companies/company.service';
 import { ApplicationQueryService } from '../../application/applications/application-query.service';
 import { AccountRole } from '../../application/auth';
 import { JobManagementService } from '../../application/jobs/job-management.service';
@@ -40,6 +40,10 @@ import {
   EmployerJobDetailResponseDto,
   EmployerJobResponseDto,
 } from '../dto/jobs.dto';
+import {
+  CompanyProfileResponseDto,
+  UpdateCompanyDto,
+} from '../dto/companies.dto';
 
 const notFoundOnNaN = () =>
   new ParseIntPipe({ errorHttpStatusCode: HttpStatus.NOT_FOUND });
@@ -53,6 +57,7 @@ export class EmployersController {
   constructor(
     private readonly jobManagementService: JobManagementService,
     private readonly applicationQueryService: ApplicationQueryService,
+    private readonly companyService: CompanyService,
   ) {}
 
   @Get('jobs')
@@ -81,15 +86,8 @@ export class EmployersController {
     @Body() body: CreateJobDto,
   ) {
     assertCompanyScope(user, companyId);
-    if (!user.companyName) {
-      throw new BadRequestException('Token thiếu thông tin tên công ty.');
-    }
 
-    return this.jobManagementService.createDraft({
-      ...body,
-      companyId,
-      companyName: user.companyName,
-    });
+    return this.jobManagementService.createDraft({ ...body, companyId });
   }
 
   @Get('jobs/:jobId')
@@ -211,5 +209,44 @@ export class EmployersController {
   ) {
     assertCompanyScope(user, companyId);
     return this.applicationQueryService.getApplicant(companyId, applicationId);
+  }
+
+  @Get('company')
+  @ApiOperation({ summary: 'Hồ sơ công ty của chính mình' })
+  @ApiOkResponse({ type: CompanyProfileResponseDto })
+  @ApiProblems(
+    HttpStatus.UNAUTHORIZED,
+    HttpStatus.FORBIDDEN,
+    HttpStatus.NOT_FOUND,
+  )
+  getCompany(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('companyId', notFoundOnNaN()) companyId: number,
+  ) {
+    assertCompanyScope(user, companyId);
+    return this.companyService.getOwnProfile(companyId);
+  }
+
+  @Put('company')
+  @ApiOperation({
+    summary: 'Cập nhật hồ sơ công ty',
+    description:
+      'Đổi tên/địa điểm sẽ được đồng bộ vào các tin của công ty. Tên không được trùng công ty khác.',
+  })
+  @ApiOkResponse({ type: CompanyProfileResponseDto })
+  @ApiProblems(
+    HttpStatus.BAD_REQUEST,
+    HttpStatus.UNAUTHORIZED,
+    HttpStatus.FORBIDDEN,
+    HttpStatus.NOT_FOUND,
+    HttpStatus.CONFLICT,
+  )
+  updateCompany(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('companyId', notFoundOnNaN()) companyId: number,
+    @Body() body: UpdateCompanyDto,
+  ) {
+    assertCompanyScope(user, companyId);
+    return this.companyService.updateProfile(companyId, body);
   }
 }

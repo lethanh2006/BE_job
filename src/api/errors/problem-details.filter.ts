@@ -14,6 +14,7 @@ import {
   JobManagementForbiddenException,
 } from '../../domain';
 import {
+  CompanyNameAlreadyExistsException,
   CurrentPasswordIncorrectException,
   EmailAlreadyExistsException,
   InvalidCredentialsException,
@@ -67,6 +68,9 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     }
     if (exception instanceof CurrentPasswordIncorrectException) {
       return make(HttpStatus.BAD_REQUEST, 'Không thể đổi mật khẩu');
+    }
+    if (exception instanceof CompanyNameAlreadyExistsException) {
+      return make(HttpStatus.CONFLICT, 'Tên công ty đã tồn tại');
     }
     if (exception instanceof EmailAlreadyExistsException) {
       return make(HttpStatus.CONFLICT, 'Email đã tồn tại');

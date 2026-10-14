@@ -63,7 +63,6 @@ export interface JobContentCommand {
 
 export interface CreateJobCommand extends JobContentCommand {
   companyId: number;
-  companyName: string;
 }
 
 export type UpdateJobCommand = JobContentCommand;
@@ -99,6 +98,7 @@ export interface SearchJobsQuery {
   category?: string | null;
   level?: JobLevel | null;
   featured?: boolean | null;
+  companyId?: number | null;
   sort?: JobSortOrder;
 }
 

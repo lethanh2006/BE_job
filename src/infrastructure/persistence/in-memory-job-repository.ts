@@ -84,6 +84,12 @@ export class InMemoryJobRepository extends JobRepository {
     );
   }
 
+  async updateCompanySnapshot(company: Company): Promise<void> {
+    for (const job of (await this.load()).values()) {
+      if (job.companyId === company.id) job.refreshCompany(company);
+    }
+  }
+
   async getNextId(): Promise<number> {
     await this.load();
     return ++this.lastId;

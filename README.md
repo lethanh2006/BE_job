@@ -87,11 +87,11 @@ sẽ thu hồi toàn bộ phiên cùng họ token.
 Tất cả route nằm dưới tiền tố `/api`.
 
 - `GET /health`
-- `GET /jobs` (lọc `keyword`, `location`, `category`, `level`, `minimumSalary`, `skills` lặp lại, `page`, `pageSize`, `sort`), `GET /jobs/:id` (bản nháp trả 404)
-- `POST /auth/login`, `POST /auth/register/candidate`, `POST /auth/refresh`, `POST /auth/logout`, `PUT /auth/password`, `GET /auth/me`
+- `GET /jobs` (lọc `keyword`, `location`, `category`, `level`, `minimumSalary`, `skills` lặp lại, `page`, `pageSize`, `sort`), `GET /jobs/categories`, `GET /jobs/:id` (bản nháp trả 404), `GET /companies/:id` (hồ sơ công khai; tin của công ty: `GET /jobs?companyId=`)
+- `POST /auth/login`, `POST /auth/register/candidate`, `POST /auth/register/employer` (tạo công ty + tài khoản quản lý), `POST /auth/refresh`, `POST /auth/logout`, `PUT /auth/password`, `GET /auth/me`
 - `POST /applications` (Candidate), `PATCH /applications/:id/status` (Employer)
 - `GET|PUT /candidates/:id/profile`, `GET /candidates/:id/applications`, `GET /candidates/:id/job-matches?jobIds=1,2`, `GET /candidates/:id/recommended-jobs` (Candidate, chỉ của chính mình)
-- `GET|POST /employers/:companyId/jobs`, `GET|PUT /employers/:companyId/jobs/:jobId`, `POST .../jobs/:jobId/publish|close`, `GET /employers/:companyId/applications`, `GET /employers/:companyId/applications/:id` (Employer, đúng công ty trong token)
+- `GET|POST /employers/:companyId/jobs`, `GET|PUT /employers/:companyId/jobs/:jobId`, `POST .../jobs/:jobId/publish|close`, `GET /employers/:companyId/applications`, `GET /employers/:companyId/applications/:id`, `GET|PUT /employers/:companyId/company` (Employer, đúng công ty trong token)
 
 Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`, `instance`).
 
@@ -120,7 +120,8 @@ unique chống ứng tuyển trùng, index `(status, deadline)`, khóa ngoại).
   `migrator.ts`. Chỉ thêm migration mới ở cuối danh sách, không sửa migration đã phát hành.
   Tất cả migration chưa chạy được áp trong một giao dịch, có khóa advisory để nhiều
   instance khởi động cùng lúc không đụng nhau.
-- Giao dịch (`Database.transaction`) dùng cho đăng ký (tài khoản + hồ sơ) và xoay refresh token.
+- Giao dịch (`Database.transaction`) dùng cho đăng ký (tài khoản + hồ sơ ứng viên, hoặc công ty + tài khoản nhà tuyển dụng) và xoay refresh token.
+- Công ty là bảng riêng (`companies`, migration `0003`). Tên công ty duy nhất không phân biệt hoa thường; `jobs.company_name/location` giữ làm bản chụp để tìm kiếm có index và được đồng bộ khi công ty đổi hồ sơ, còn `user_accounts` đọc tên công ty qua JOIN. Migration 0003 có test chạy trên dữ liệu cũ (gồm trường hợp tên công ty trùng).
 - Các tình huống chạy song song (ứng tuyển trùng, xoay token đồng thời) được chặn bằng ràng
   buộc/điều kiện ở chính câu lệnh SQL và có test tích hợp (`test/postgres.e2e-spec.ts`).
 
@@ -130,5 +131,6 @@ unique chống ứng tuyển trùng, index `(status, deadline)`, khóa ngoại).
 - Email hồ sơ và email tài khoản được so khớp không phân biệt hoa thường (unique index trên `lower(email)`).
 - `GET /jobs/:id` không trả bản nháp (bản C# trả mọi tin, kể cả chưa đăng); thêm `status`, `expired` vào chi tiết tin.
 - Tìm kiếm không phân biệt dấu tiếng Việt và lọc/phân trang ở tầng lưu trữ thay vì tải toàn bộ tin.
+- Có đăng ký nhà tuyển dụng (bản C# chỉ có tài khoản demo) và bảng công ty; bản chụp công ty trong tin lấy từ hồ sơ công ty thay vì dùng địa điểm của tin.
 - Tên ứng viên trong danh sách đơn ứng tuyển lấy từ repository ứng viên thay vì bảng tên cố định.
 - Đổi email hồ sơ trùng ứng viên khác trả 409 (bản C# trả 500); vượt giới hạn số kỹ năng trả 400.

@@ -77,7 +77,7 @@ function normalizeContent(
 export class Job {
   readonly id: number;
   readonly companyId: number;
-  readonly company: Company | null;
+  private currentCompany: Company | null;
   readonly postedAt: Date;
   readonly featured: boolean;
   private content: JobContent;
@@ -108,7 +108,7 @@ export class Job {
 
     this.id = props.id;
     this.companyId = props.companyId;
-    this.company = props.company ?? null;
+    this.currentCompany = props.company ?? null;
     this.content = normalizeContent({
       ...props,
       location: props.location ?? '',
@@ -131,6 +131,21 @@ export class Job {
   /** Khôi phục từ nơi lưu trữ: giữ nguyên trạng thái, không kiểm tra hạn nộp. */
   static restore(props: JobProps & { status: JobStatus }): Job {
     return new Job(props, props.status, false);
+  }
+
+  /** Bản chụp thông tin công ty đi kèm tin (để hiển thị và tìm kiếm). */
+  get company(): Company | null {
+    return this.currentCompany;
+  }
+
+  /** Cập nhật bản chụp công ty khi công ty đổi hồ sơ. */
+  refreshCompany(company: Company): void {
+    if (company.id !== this.companyId) {
+      throw new ArgumentError(
+        'Công ty không khớp với CompanyId của tin tuyển dụng.',
+      );
+    }
+    this.currentCompany = company;
   }
 
   get title(): string {

@@ -67,6 +67,8 @@ export class SearchJobsQueryDto {
   @IsOptional() @IsEnum(JobLevel) level?: JobLevel;
   /** Chỉ lấy tin có mức lương tối thiểu từ giá trị này. */
   @IsOptional() @Type(() => Number) @IsNumber() minimumSalary?: number;
+  /** Chỉ lấy tin của công ty này. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) companyId?: number;
   /** `true` chỉ lấy tin nổi bật, `false` chỉ lấy tin thường; bỏ trống để lấy cả hai. */
   @IsOptional()
   @Transform(({ value }: { value: unknown }) =>

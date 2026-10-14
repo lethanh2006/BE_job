@@ -2,12 +2,14 @@ import { Provider } from '@nestjs/common';
 import {
   AccountRegistrationRepository,
   AccountSecurityRepository,
+  EmployerRegistrationRepository,
   PasswordHasher,
   RefreshTokenRepository,
   UserAccountRepository,
 } from '../../application/abstractions/authentication';
 import {
   CandidateRepository,
+  CompanyRepository,
   JobApplicationRepository,
   JobRepository,
   JobSearchReader,
@@ -17,6 +19,7 @@ import { Clock } from '../../domain';
 import { Database } from '../postgres/database';
 import { DatabaseInitializer } from '../postgres/database-initializer';
 import { PostgresCandidateRepository } from '../postgres/postgres-candidate-repository';
+import { PostgresCompanyRepository } from '../postgres/postgres-company-repository';
 import { PostgresJobApplicationRepository } from '../postgres/postgres-job-application-repository';
 import { PostgresJobRepository } from '../postgres/postgres-job-repository';
 import { PostgresJobSearchReader } from '../postgres/postgres-job-search-reader';
@@ -24,6 +27,7 @@ import { PostgresRefreshTokenRepository } from '../postgres/postgres-refresh-tok
 import { PostgresUserAccountRepository } from '../postgres/postgres-user-account-repository';
 import { JOB_SEED_FILE } from '../seed/paths';
 import { InMemoryCandidateRepository } from './in-memory-candidate-repository';
+import { InMemoryCompanyRepository } from './in-memory-company-repository';
 import { InMemoryJobApplicationRepository } from './in-memory-job-application-repository';
 import { InMemoryJobRepository } from './in-memory-job-repository';
 import { InMemoryJobSearchReader } from './in-memory-job-search-reader';
@@ -36,6 +40,7 @@ const USER_ACCOUNTS = Symbol('USER_ACCOUNTS');
 const accountAliases: Provider[] = [
   { provide: UserAccountRepository, useExisting: USER_ACCOUNTS },
   { provide: AccountRegistrationRepository, useExisting: USER_ACCOUNTS },
+  { provide: EmployerRegistrationRepository, useExisting: USER_ACCOUNTS },
   { provide: AccountSecurityRepository, useExisting: USER_ACCOUNTS },
 ];
 
@@ -65,10 +70,22 @@ function inMemoryProviders(): Provider[] {
       useFactory: () => new InMemoryCandidateRepository(true),
     },
     {
+      provide: CompanyRepository,
+      useFactory: () => new InMemoryCompanyRepository(JOB_SEED_FILE),
+    },
+    {
       provide: USER_ACCOUNTS,
-      inject: [PasswordHasher, CandidateRepository],
-      useFactory: (hasher: PasswordHasher, candidates: CandidateRepository) =>
-        InMemoryUserAccountRepository.createWithDemoData(hasher, candidates),
+      inject: [PasswordHasher, CandidateRepository, CompanyRepository],
+      useFactory: (
+        hasher: PasswordHasher,
+        candidates: CandidateRepository,
+        companies: CompanyRepository,
+      ) =>
+        InMemoryUserAccountRepository.createWithDemoData(
+          hasher,
+          candidates,
+          companies,
+        ),
     },
     ...accountAliases,
   ];
@@ -96,6 +113,11 @@ function postgresProviders(config: AppConfig): Provider[] {
       provide: CandidateRepository,
       inject: [Database],
       useFactory: (db: Database) => new PostgresCandidateRepository(db),
+    },
+    {
+      provide: CompanyRepository,
+      inject: [Database],
+      useFactory: (db: Database) => new PostgresCompanyRepository(db),
     },
     {
       provide: JobApplicationRepository,

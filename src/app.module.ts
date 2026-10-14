@@ -11,6 +11,7 @@ import { LoginService } from './application/auth/login.service';
 import { PasswordChangeService } from './application/auth/password-change.service';
 import { RegistrationService } from './application/auth/registration.service';
 import { SessionService } from './application/auth/session.service';
+import { CompanyService } from './application/companies/company.service';
 import { CandidateProfileService } from './application/candidates/candidate-profile.service';
 import { CandidateMatchService } from './application/matching/candidate-match.service';
 import { JobMatchService } from './application/matching/job-match.service';
@@ -20,6 +21,7 @@ import { JobSearchService } from './application/jobs/job-search.service';
 import { JwtAuthGuard, RolesGuard } from './api/auth/auth';
 import { ApplicationsController } from './api/controllers/applications.controller';
 import { AuthController } from './api/controllers/auth.controller';
+import { CompaniesController } from './api/controllers/companies.controller';
 import { CandidatesController } from './api/controllers/candidates.controller';
 import { EmployersController } from './api/controllers/employers.controller';
 import { HealthController } from './api/controllers/health.controller';
@@ -39,6 +41,7 @@ import { persistenceProviders } from './infrastructure/persistence/persistence-p
     AuthController,
     ApplicationsController,
     CandidatesController,
+    CompaniesController,
     EmployersController,
   ],
   providers: [
@@ -62,6 +65,7 @@ import { persistenceProviders } from './infrastructure/persistence/persistence-p
     ApplicationService,
     ApplicationQueryService,
     CandidateProfileService,
+    CompanyService,
     LoginService,
     SessionService,
     RegistrationService,

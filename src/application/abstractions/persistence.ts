@@ -1,4 +1,10 @@
-import { Candidate, Job, JobApplication, JobLevel } from '../../domain';
+import {
+  Candidate,
+  Company,
+  Job,
+  JobApplication,
+  JobLevel,
+} from '../../domain';
 import { JobSortOrder, JobSummaryDto } from '../jobs/dto';
 
 export interface Repository<TEntity> {
@@ -15,6 +21,8 @@ export abstract class JobRepository implements Repository<Job> {
   abstract getAll(): Promise<Job[]>;
   abstract getByIds(ids: readonly number[]): Promise<Job[]>;
   abstract getByCompanyId(companyId: number): Promise<Job[]>;
+  /** Đồng bộ tên/địa điểm công ty đã lưu kèm các tin (dùng cho tìm kiếm) sau khi công ty đổi hồ sơ. */
+  abstract updateCompanySnapshot(company: Company): Promise<void>;
 }
 
 export abstract class CandidateRepository implements Repository<Candidate> {
@@ -49,6 +57,8 @@ export interface JobSearchCriteria {
   minimumSalary?: number;
   /** Chỉ lấy tin nổi bật. */
   featured?: boolean;
+  /** Chỉ lấy tin của một công ty. */
+  companyId?: number;
   /**
    * Tin phải có đủ tất cả kỹ năng này. Đã được `foldText` (không dấu, chữ thường); so khớp chính xác.
    * Từ khóa, địa điểm, lĩnh vực cũng so khớp kiểu "chứa" không phân biệt hoa thường và dấu.
@@ -78,4 +88,13 @@ export abstract class JobSearchReader {
 export interface JobCategoryCount {
   name: string;
   count: number;
+}
+
+export abstract class CompanyRepository {
+  abstract getById(id: number): Promise<Company | null>;
+  abstract getNextId(): Promise<number>;
+  /** Ném CompanyNameAlreadyExistsException nếu tên đã được công ty khác dùng. */
+  abstract add(company: Company): Promise<void>;
+  /** Ném CompanyNameAlreadyExistsException nếu tên đã được công ty khác dùng. */
+  abstract update(company: Company): Promise<void>;
 }
