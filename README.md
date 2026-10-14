@@ -10,7 +10,7 @@ Giữ nguyên kiến trúc phân lớp, route, JSON contract và quy tắc nghi�
 src/
   domain/          Entity, value object, exception và quy tắc nghiệp vụ (không phụ thuộc framework)
   application/     Use case (service), DTO và abstraction (abstract class dùng làm DI token)
-  infrastructure/  Triển khai cụ thể: repository in-memory, PBKDF2, refresh token, JWT
+  infrastructure/  Triển khai cụ thể: repository in-memory và PostgreSQL (pg + migration), PBKDF2, refresh token, JWT
   api/             Controller, DTO request, guard xác thực/phân quyền, bộ lọc lỗi ProblemDetails
   config/          Đọc cấu hình từ biến môi trường
   data/seed/       Dữ liệu tin tuyển dụng mẫu (jobs.json)
@@ -22,20 +22,31 @@ Chiều phụ thuộc: `api → application → domain`, `infrastructure → app
 
 ## Chạy
 
-Yêu cầu Node.js 20.12+ (dùng `process.loadEnvFile`) và npm.
+Yêu cầu Node.js 22.12+ và npm. Docker chỉ cần khi dùng PostgreSQL.
 
 ```bash
 npm install
 cp .env.example .env     # tùy chọn; có giá trị mặc định cho môi trường dev
-npm run start:dev        # http://localhost:5000/api
+npm run start:dev        # InMemory, http://localhost:5000/api
 ```
+
+Chạy với PostgreSQL:
+
+```bash
+npm run db:up            # PostgreSQL 17 ở localhost:5434 (docker compose)
+npm run start:pg         # PERSISTENCE_PROVIDER=PostgreSql + tự áp migration và seed
+```
+
+Tài liệu API: Swagger UI tại <http://localhost:5000/api/docs>, OpenAPI JSON tại
+`/api/openapi.json` (bật mặc định ngoài production, tắt bằng `OPENAPI_ENABLED=false`).
 
 Kiểm tra:
 
 ```bash
 npm run build
-npm test                 # unit test
-npm run test:e2e         # e2e test toàn bộ luồng API
+npm test                 # unit test (không cần DB)
+npm run test:e2e         # e2e toàn bộ luồng API với repository in-memory
+npm run test:e2e:pg      # chạy lại e2e + kiểm thử tầng lưu trữ trên PostgreSQL thật (cần db:up)
 npm run lint
 ```
 
@@ -51,7 +62,10 @@ npm run lint
 | `JWT_ACCESS_TOKEN_MINUTES` | `15` | |
 | `JWT_REFRESH_TOKEN_DAYS` | `7` | |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Danh sách origin, ngăn cách bằng dấu phẩy |
-| `PERSISTENCE_PROVIDER` | `InMemory` | Hiện chỉ hỗ trợ `InMemory` |
+| `PERSISTENCE_PROVIDER` | `InMemory` | `InMemory` hoặc `PostgreSql` |
+| `DATABASE_URL` | URL dev ở cổng 5434 | Bắt buộc khi `NODE_ENV=production` và dùng PostgreSql |
+| `PERSISTENCE_APPLY_MIGRATIONS` | `false` | `true`: áp migration và nạp dữ liệu mẫu cho bảng còn trống khi khởi động |
+| `OPENAPI_ENABLED` | bật ngoài production | Phát `/api/docs` và `/api/openapi.json` |
 
 ## Tài khoản demo
 
@@ -81,10 +95,24 @@ Tất cả route nằm dưới tiền tố `/api`.
 
 Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`, `instance`).
 
+## Cơ sở dữ liệu
+
+Truy cập PostgreSQL bằng `pg` với SQL tham số hóa, không dùng ORM: mapping giữa dòng dữ liệu
+và entity domain nằm trong `infrastructure/postgres/row-mapper.ts`. Lược đồ tương đương
+migration EF Core của backend C# (sequence cấp mã `job_ids`/`application_ids`/`user_ids`,
+unique chống ứng tuyển trùng, index `(status, deadline)`, khóa ngoại).
+
+- Migration là các module TypeScript trong `infrastructure/postgres/migrations/`, đăng ký ở
+  `migrator.ts`. Chỉ thêm migration mới ở cuối danh sách, không sửa migration đã phát hành.
+  Tất cả migration chưa chạy được áp trong một giao dịch, có khóa advisory để nhiều
+  instance khởi động cùng lúc không đụng nhau.
+- Giao dịch (`Database.transaction`) dùng cho đăng ký (tài khoản + hồ sơ) và xoay refresh token.
+- Các tình huống chạy song song (ứng tuyển trùng, xoay token đồng thời) được chặn bằng ràng
+  buộc/điều kiện ở chính câu lệnh SQL và có test tích hợp (`test/postgres.e2e-spec.ts`).
+
 ## Khác biệt so với backend C#
 
-- Chưa có chế độ PostgreSQL/EF Core: dữ liệu chỉ nằm trong bộ nhớ (mất khi khởi động lại).
-  Các repository là abstract class nên có thể thêm bản PostgreSQL mà không đổi use case.
-- Chưa có endpoint OpenAPI (`/openapi/v1.json`).
+- Truy cập dữ liệu bằng `pg` + SQL tay thay cho EF Core; migration viết bằng TypeScript.
+- Email hồ sơ và email tài khoản được so khớp không phân biệt hoa thường (unique index trên `lower(email)`).
 - Tên ứng viên trong danh sách đơn ứng tuyển lấy từ repository ứng viên thay vì bảng tên cố định.
-- Vượt giới hạn số kỹ năng trả HTTP 400 (bản C# trả 500 do ném `InvalidOperationException`).
+- Đổi email hồ sơ trùng ứng viên khác trả 409 (bản C# trả 500); vượt giới hạn số kỹ năng trả 400.

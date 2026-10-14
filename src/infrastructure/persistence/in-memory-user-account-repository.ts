@@ -6,9 +6,8 @@ import {
   UserAccountRepository,
 } from '../../application/abstractions/authentication';
 import { CandidateRepository } from '../../application/abstractions/persistence';
-import { AccountRole, UserAccount } from '../../application/auth';
-
-const DEMO_PASSWORD = 'JobBoard@123';
+import { UserAccount } from '../../application/auth';
+import { createDemoAccounts } from '../seed/demo-data';
 
 /** Một lớp triển khai cả 3 abstraction về tài khoản (đọc, đăng ký, bảo mật). */
 export class InMemoryUserAccountRepository
@@ -28,32 +27,7 @@ export class InMemoryUserAccountRepository
     candidates: CandidateRepository,
   ): Promise<InMemoryUserAccountRepository> {
     const repository = new InMemoryUserAccountRepository(candidates);
-    const passwordHash = await passwordHasher.hash(DEMO_PASSWORD);
-    const demoAccounts: UserAccount[] = [
-      {
-        id: 20,
-        name: 'Nguyễn Minh An',
-        email: 'candidate@jobboard.vn',
-        passwordHash,
-        role: AccountRole.Candidate,
-      },
-      {
-        id: 1,
-        name: 'Trần Bình',
-        email: 'employer@jobboard.vn',
-        passwordHash,
-        role: AccountRole.Employer,
-        companyId: 1,
-        companyName: 'Nova Technology',
-      },
-      {
-        id: 100,
-        name: 'Quản trị viên',
-        email: 'admin@jobboard.vn',
-        passwordHash,
-        role: AccountRole.Admin,
-      },
-    ];
+    const demoAccounts = await createDemoAccounts(passwordHasher);
 
     demoAccounts.forEach((account) =>
       repository.accounts.set(account.email.toLowerCase(), account),

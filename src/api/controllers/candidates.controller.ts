@@ -9,6 +9,12 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ApplicationQueryService } from '../../application/applications/application-query.service';
 import { AccountRole } from '../../application/auth';
 import { CandidateProfileService } from '../../application/candidates/candidate-profile.service';
@@ -19,7 +25,12 @@ import {
   Roles,
   RolesGuard,
 } from '../auth/auth';
-import { UpdateCandidateProfileDto } from '../dto/dto';
+import { ApiProblems } from '../dto/api-responses';
+import { ApplicationDetailResponseDto } from '../dto/applications.dto';
+import {
+  CandidateProfileResponseDto,
+  UpdateCandidateProfileDto,
+} from '../dto/candidates.dto';
 
 const CandidateId = () =>
   Param(
@@ -32,6 +43,8 @@ function assertSelf(user: AuthPrincipal, candidateId: number): void {
   if (candidateId !== user.id) throw new ForbiddenException();
 }
 
+@ApiTags('Ứng viên')
+@ApiBearerAuth()
 @Controller('candidates')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(AccountRole.Candidate)
@@ -42,6 +55,13 @@ export class CandidatesController {
   ) {}
 
   @Get(':candidateId/profile')
+  @ApiOperation({ summary: 'Xem hồ sơ của chính mình' })
+  @ApiOkResponse({ type: CandidateProfileResponseDto })
+  @ApiProblems(
+    HttpStatus.UNAUTHORIZED,
+    HttpStatus.FORBIDDEN,
+    HttpStatus.NOT_FOUND,
+  )
   getProfile(
     @CurrentUser() user: AuthPrincipal,
     @CandidateId() candidateId: number,
@@ -51,6 +71,16 @@ export class CandidatesController {
   }
 
   @Put(':candidateId/profile')
+  @ApiOperation({
+    summary: 'Cập nhật hồ sơ, khoảng lương mong muốn và kỹ năng',
+  })
+  @ApiOkResponse({ type: CandidateProfileResponseDto })
+  @ApiProblems(
+    HttpStatus.BAD_REQUEST,
+    HttpStatus.UNAUTHORIZED,
+    HttpStatus.FORBIDDEN,
+    HttpStatus.NOT_FOUND,
+  )
   updateProfile(
     @CurrentUser() user: AuthPrincipal,
     @CandidateId() candidateId: number,
@@ -61,6 +91,9 @@ export class CandidatesController {
   }
 
   @Get(':candidateId/applications')
+  @ApiOperation({ summary: 'Lịch sử ứng tuyển của chính mình, mới nhất trước' })
+  @ApiOkResponse({ type: [ApplicationDetailResponseDto] })
+  @ApiProblems(HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN)
   getApplications(
     @CurrentUser() user: AuthPrincipal,
     @CandidateId() candidateId: number,

@@ -6,10 +6,17 @@ import {
   ParseIntPipe,
   Query,
 } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JobDetailService } from '../../application/jobs/job-detail.service';
 import { JobSearchService } from '../../application/jobs/job-search.service';
-import { SearchJobsQueryDto } from '../dto/dto';
+import { ApiProblems } from '../dto/api-responses';
+import {
+  JobDetailResponseDto,
+  PagedJobsResponseDto,
+  SearchJobsQueryDto,
+} from '../dto/jobs.dto';
 
+@ApiTags('Việc làm')
 @Controller('jobs')
 export class JobsController {
   constructor(
@@ -18,11 +25,21 @@ export class JobsController {
   ) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Tìm kiếm tin đang tuyển',
+    description:
+      'Chỉ trả tin ở trạng thái Published và chưa hết hạn; hỗ trợ lọc, sắp xếp và phân trang.',
+  })
+  @ApiOkResponse({ type: PagedJobsResponseDto })
+  @ApiProblems(HttpStatus.BAD_REQUEST)
   search(@Query() query: SearchJobsQueryDto) {
     return this.searchService.search(query);
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Xem đầy đủ nội dung một tin tuyển dụng' })
+  @ApiOkResponse({ type: JobDetailResponseDto })
+  @ApiProblems(HttpStatus.NOT_FOUND)
   getById(
     @Param(
       'id',

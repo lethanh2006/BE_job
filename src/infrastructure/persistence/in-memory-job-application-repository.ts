@@ -1,4 +1,5 @@
-import { ApplicationStatus, JobApplication } from '../../domain';
+import { JobApplication } from '../../domain';
+import { createDemoApplications } from '../seed/demo-data';
 import { JobApplicationRepository } from '../../application/abstractions/persistence';
 
 export class InMemoryJobApplicationRepository extends JobApplicationRepository {
@@ -9,29 +10,7 @@ export class InMemoryJobApplicationRepository extends JobApplicationRepository {
     super();
     if (!seedDemoData) return;
 
-    const seeds = [
-      new JobApplication(
-        1,
-        2,
-        20,
-        new Date('2026-09-25T08:00:00Z'),
-        ApplicationStatus.Reviewing,
-      ),
-      new JobApplication(
-        2,
-        5,
-        20,
-        new Date('2026-09-21T08:00:00Z'),
-        ApplicationStatus.Submitted,
-      ),
-      new JobApplication(
-        3,
-        6,
-        20,
-        new Date('2026-09-12T08:00:00Z'),
-        ApplicationStatus.Rejected,
-      ),
-    ];
+    const seeds = createDemoApplications();
     seeds.forEach((application) =>
       this.applications.set(application.id, application),
     );

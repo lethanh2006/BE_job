@@ -1,12 +1,60 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { ArgumentError } from '../src/domain';
+import { configureApp } from '../src/app-setup';
+import { AppConfig } from '../src/config/app-config';
+import { setupOpenApi } from '../src/openapi';
+import { createTestDatabase } from './support/postgres-test-database';
 
 const PASSWORD = 'JobBoard@123';
 
-describe('JobBoard API (e2e)', () => {
+const baseEnv = {
+  NODE_ENV: 'test',
+  JWT_SIGNING_KEY: 'test-signing-key-test-signing-key-123456',
+};
+
+interface Backend {
+  name: string;
+  setup(): Promise<AppConfig>;
+  teardown(): Promise<void>;
+}
+
+const inMemoryBackend: Backend = {
+  name: 'InMemory',
+  setup: () => Promise.resolve(AppConfig.fromEnv(baseEnv)),
+  teardown: () => Promise.resolve(),
+};
+
+/** Mỗi lần chạy dùng một database riêng để không đụng dữ liệu phát triển. */
+function postgresBackend(adminUrl: string): Backend {
+  let database: Awaited<ReturnType<typeof createTestDatabase>>;
+
+  return {
+    name: 'PostgreSql',
+    async setup() {
+      database = await createTestDatabase(adminUrl);
+      return AppConfig.fromEnv({
+        ...baseEnv,
+        PERSISTENCE_PROVIDER: 'PostgreSql',
+        DATABASE_URL: database.url,
+        PERSISTENCE_APPLY_MIGRATIONS: 'true',
+      });
+    },
+    teardown: () => database.drop(),
+  };
+}
+
+// Suite PostgreSql chỉ chạy khi có E2E_POSTGRES_URL (kết nối quản trị, ví dụ
+// postgres://jobboard:jobboard_dev_password@localhost:5434/postgres).
+const backends = [
+  inMemoryBackend,
+  ...(process.env.E2E_POSTGRES_URL
+    ? [postgresBackend(process.env.E2E_POSTGRES_URL)]
+    : []),
+];
+
+describe.each(backends)('JobBoard API (e2e) — $name', (backend) => {
   let app: INestApplication;
   const http = () => request(app.getHttpServer());
 
@@ -15,28 +63,34 @@ describe('JobBoard API (e2e)', () => {
   const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
   beforeAll(async () => {
-    process.env.JWT_SIGNING_KEY = 'test-signing-key-test-signing-key-123456';
+    const config = await backend.setup();
     const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
+      imports: [AppModule.register(config)],
     }).compile();
     app = moduleRef.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        exceptionFactory: (errors) =>
-          new ArgumentError(
-            errors
-              .flatMap((error) => Object.values(error.constraints ?? {}))
-              .join('; '),
-          ),
-      }),
-    );
+    configureApp(app, config);
+    setupOpenApi(app);
     await app.init();
+  }, 60_000);
+
+  afterAll(async () => {
+    await app.close();
+    await backend.teardown();
   });
 
-  afterAll(() => app.close());
+  it('phát tài liệu OpenAPI đủ các nhóm endpoint', async () => {
+    const res = await http().get('/api/openapi.json').expect(200);
+    expect(Object.keys(res.body.paths)).toEqual(
+      expect.arrayContaining([
+        '/api/jobs',
+        '/api/auth/login',
+        '/api/applications/{id}/status',
+        '/api/employers/{companyId}/jobs/{jobId}/publish',
+      ]),
+    );
+    expect(res.body.components.securitySchemes.bearer).toBeDefined();
+    await http().get('/api/docs').expect(200);
+  });
 
   it('GET /api/health', async () => {
     await http().get('/api/health').expect(200, { status: 'healthy' });

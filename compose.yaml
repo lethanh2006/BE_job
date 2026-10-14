@@ -1,0 +1,22 @@
+# PostgreSQL cho môi trường phát triển (cùng thông số với backend C#).
+#   docker compose up -d --wait
+#   PERSISTENCE_PROVIDER=PostgreSql PERSISTENCE_APPLY_MIGRATIONS=true npm run start:dev
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: jobboard
+      POSTGRES_USER: jobboard
+      POSTGRES_PASSWORD: jobboard_dev_password
+    ports:
+      - "127.0.0.1:5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobboard -d jobboard"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - jobboard_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  jobboard_postgres_data:

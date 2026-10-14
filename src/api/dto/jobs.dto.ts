@@ -12,53 +12,18 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { ApplicationStatus, JobLevel, WorkMode } from '../../domain';
+import { JobLevel, JobStatus, WorkMode } from '../../domain';
 import { JobSortOrder } from '../../application/jobs/dto';
 
 const toArray = ({ value }: { value: unknown }) =>
   value === undefined ? undefined : Array.isArray(value) ? value : [value];
-
-export class LoginDto {
-  @IsString() email!: string;
-  @IsString() password!: string;
-}
-
-export class RegisterCandidateDto {
-  @IsString() name!: string;
-  @IsString() email!: string;
-  @IsString() password!: string;
-}
-
-export class RefreshTokenDto {
-  @IsString() refreshToken!: string;
-}
-
-export class ChangePasswordDto {
-  @IsString() currentPassword!: string;
-  @IsString() newPassword!: string;
-}
-
-export class ApplyDto {
-  @IsInt() jobId!: number;
-}
-
-export class ChangeApplicationStatusDto {
-  @IsEnum(ApplicationStatus) status!: ApplicationStatus;
-}
-
-export class UpdateCandidateProfileDto {
-  @IsString() email!: string;
-  @IsOptional() @IsString() bio?: string | null;
-  @IsOptional() @IsNumber() desiredSalaryMin?: number | null;
-  @IsOptional() @IsNumber() desiredSalaryMax?: number | null;
-  @IsArray() @IsString({ each: true }) skills!: string[];
-}
 
 export class CreateJobDto {
   @IsString() @IsNotEmpty() title!: string;
   @IsString() location!: string;
   @IsNumber() salaryMin!: number;
   @IsNumber() salaryMax!: number;
+  /** Hạn nộp hồ sơ (ISO 8601), phải ở tương lai. */
   @Type(() => Date) @IsDate() deadline!: Date;
   @IsEnum(JobLevel) level!: JobLevel;
   @IsEnum(WorkMode) workMode!: WorkMode;
@@ -68,11 +33,14 @@ export class CreateJobDto {
 }
 
 export class SearchJobsQueryDto {
+  /** Tìm trong tiêu đề, tên công ty và kỹ năng. */
   @IsOptional() @IsString() keyword?: string;
   @IsOptional() @IsString() location?: string;
   @IsOptional() @IsString() category?: string;
   @IsOptional() @IsEnum(JobLevel) level?: JobLevel;
+  /** Chỉ lấy tin có mức lương tối thiểu từ giá trị này. */
   @IsOptional() @Type(() => Number) @IsNumber() minimumSalary?: number;
+  /** Lặp lại tham số để lọc nhiều kỹ năng (phải có đủ tất cả). */
   @IsOptional()
   @Transform(toArray)
   @IsString({ each: true })
@@ -85,4 +53,46 @@ export class SearchJobsQueryDto {
   @Max(100)
   pageSize?: number = 20;
   @IsOptional() @IsEnum(JobSortOrder) sort?: JobSortOrder = JobSortOrder.Newest;
+}
+
+export class JobSummaryResponseDto {
+  id!: number;
+  title!: string;
+  companyId!: number;
+  company!: string;
+  location!: string;
+  salaryMin!: number;
+  salaryMax!: number;
+  level!: JobLevel;
+  workMode!: WorkMode;
+  category!: string;
+  deadline!: Date;
+  postedAt!: Date;
+  featured!: boolean;
+  skills!: string[];
+}
+
+export class JobDetailResponseDto extends JobSummaryResponseDto {
+  summary!: string;
+  description!: string[];
+  requirements!: string[];
+  benefits!: string[];
+}
+
+export class PagedJobsResponseDto {
+  items!: JobSummaryResponseDto[];
+  page!: number;
+  pageSize!: number;
+  totalItems!: number;
+  totalPages!: number;
+}
+
+export class EmployerJobResponseDto {
+  id!: number;
+  title!: string;
+  status!: JobStatus;
+  /** Số đơn ứng tuyển đã nhận. */
+  applications!: number;
+  deadline!: Date;
+  postedAt!: Date;
 }

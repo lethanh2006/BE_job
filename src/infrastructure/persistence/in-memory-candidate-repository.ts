@@ -1,4 +1,5 @@
-import { Candidate, SalaryRange, Skill } from '../../domain';
+import { Candidate } from '../../domain';
+import { createDemoCandidate } from '../seed/demo-data';
 import { CandidateRepository } from '../../application/abstractions/persistence';
 
 export class InMemoryCandidateRepository extends CandidateRepository {
@@ -8,16 +9,7 @@ export class InMemoryCandidateRepository extends CandidateRepository {
     super();
     if (!seedDemoData) return;
 
-    const candidate = new Candidate(
-      20,
-      'Nguyễn Minh An',
-      'an@example.com',
-      'Backend Developer yêu thích sản phẩm có tác động thực tế và những hệ thống được thiết kế chỉn chu.',
-      new SalaryRange(1800, 2800),
-    );
-    ['C#', 'ASP.NET Core', 'PostgreSQL', 'Docker'].forEach((skill) =>
-      candidate.addSkill(new Skill(skill)),
-    );
+    const candidate = createDemoCandidate();
     this.candidates.set(candidate.id, candidate);
   }
 
