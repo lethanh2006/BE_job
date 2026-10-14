@@ -1,3 +1,4 @@
+import { foldText } from '../../application/common/text-folding';
 import { Candidate } from '../../domain';
 import { CandidateRepository } from '../../application/abstractions/persistence';
 import { EmailAlreadyExistsException } from '../../application/exceptions';
@@ -22,6 +23,21 @@ export class PostgresCandidateRepository extends CandidateRepository {
     const { rows } = await this.db.query<CandidateRow>(
       'SELECT * FROM candidates WHERE id = ANY($1::int[]) ORDER BY id',
       [ids],
+    );
+    return rows.map(toCandidate);
+  }
+
+  async findBySkills(
+    skills: readonly string[],
+    limit: number,
+  ): Promise<Candidate[]> {
+    const folded = [...new Set(skills.map(foldText))];
+    if (folded.length === 0) return [];
+
+    const { rows } = await this.db.query<CandidateRow>(
+      `SELECT id, name, email, bio, desired_salary_min, desired_salary_max, skills
+         FROM candidates WHERE skills_folded && $1::text[] ORDER BY id LIMIT $2`,
+      [folded, limit],
     );
     return rows.map(toCandidate);
   }

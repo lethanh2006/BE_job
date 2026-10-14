@@ -1,3 +1,4 @@
+import { makeNotifier } from '../../testing/test-helpers';
 import {
   ArgumentError,
   ApplicationStatus,
@@ -71,6 +72,7 @@ async function setup() {
       refreshTokens,
       audit,
       clock,
+      makeNotifier(),
     ),
     queries: new AdminQueryService(
       new InMemoryAdminReader(jobs, applications, companies, accounts),
@@ -78,8 +80,14 @@ async function setup() {
     ),
     search: new JobSearchService(new InMemoryJobSearchReader(jobs)),
     detail: new JobDetailService(jobs),
-    management: new JobManagementService(jobs, applications, companies, clock),
-    apply: new ApplicationService(jobs, applications, clock),
+    management: new JobManagementService(
+      jobs,
+      applications,
+      companies,
+      clock,
+      makeNotifier(),
+    ),
+    apply: new ApplicationService(jobs, applications, clock, makeNotifier()),
   };
 }
 

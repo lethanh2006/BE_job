@@ -1,3 +1,4 @@
+import { makeNotifier } from '../../testing/test-helpers';
 import { Candidate, JobStatus, SalaryRange, Skill } from '../../domain';
 import { InMemoryCandidateRepository } from '../../infrastructure/persistence/in-memory-candidate-repository';
 import { InMemoryJobApplicationRepository } from '../../infrastructure/persistence/in-memory-job-application-repository';
@@ -37,7 +38,7 @@ describe('CandidateMatchService', () => {
     return {
       applications,
       jobs,
-      apply: new ApplicationService(jobs, applications, clock),
+      apply: new ApplicationService(jobs, applications, clock, makeNotifier()),
       service: new CandidateMatchService(
         candidates,
         jobs,

@@ -90,6 +90,8 @@ Tất cả route nằm dưới tiền tố `/api`.
 - `GET /jobs` (lọc `keyword`, `location`, `category`, `level`, `minimumSalary`, `skills` lặp lại, `page`, `pageSize`, `sort`), `GET /jobs/categories`, `GET /jobs/:id` (bản nháp trả 404), `GET /companies/:id` (hồ sơ công khai; tin của công ty: `GET /jobs?companyId=`)
 - `POST /auth/login`, `POST /auth/register/candidate`, `POST /auth/register/employer` (tạo công ty + tài khoản quản lý), `POST /auth/refresh`, `POST /auth/logout`, `PUT /auth/password`, `GET /auth/me`
 - `POST /applications` (Candidate), `PATCH /applications/:id/status` (Employer)
+- `GET /notifications` (`unreadOnly`, `page`, `pageSize`), `GET /notifications/unread-count`,
+  `PATCH /notifications/:id/read`, `PATCH /notifications/read-all` (đã đăng nhập, chỉ dữ liệu của chính mình)
 - `GET|PUT /candidates/:id/profile`, `GET /candidates/:id/applications`, `GET /candidates/:id/job-matches?jobIds=1,2`, `GET /candidates/:id/recommended-jobs` (Candidate, chỉ của chính mình)
 - `GET /admin/stats`, `GET /admin/jobs|companies|users|audit-logs`, `POST /admin/jobs/:id/takedown|reinstate`, `POST /admin/companies/:id/suspend|reactivate`, `POST /admin/users/:id/disable|enable` (Admin)
 - `GET|POST /employers/:companyId/jobs`, `GET|PUT /employers/:companyId/jobs/:jobId`, `POST .../jobs/:jobId/publish|close`, `GET /employers/:companyId/applications`, `GET /employers/:companyId/applications/:id`, `GET|PUT /employers/:companyId/company` (Employer, đúng công ty trong token)
@@ -123,6 +125,30 @@ Lỗi trả về dạng `application/problem+json` (`status`, `title`, `detail`,
 - Mọi thao tác ghi vào `audit_logs` (ai, làm gì, lúc nào, lý do) và đọc lại qua `GET /admin/audit-logs`.
 - Các màn hình liệt kê/thống kê đi qua `AdminReader` (phía đọc, lọc/đếm/phân trang trong SQL); có test so khớp
   PostgreSQL với bản in-memory trên cùng một kịch bản.
+
+## Thông báo trong ứng dụng
+
+- Ứng tuyển thành công báo cho các tài khoản nhà tuyển dụng đang hoạt động của
+  công ty; đổi trạng thái đơn báo cho ứng viên. Gửi lại cùng trạng thái không tạo
+  thêm thông báo. Gỡ/khôi phục tin và khóa/mở khóa công ty báo cho nhà tuyển dụng,
+  kèm lý do kiểm duyệt khi có.
+- Khi đăng tin, chọn tối đa 300 hồ sơ có kỹ năng liên quan theo mã tăng dần, chấm
+  điểm bằng `JobMatchService`, rồi gửi cho tối đa 100 ứng viên trong nhóm này có
+  điểm từ 70 trở lên. Đây là nhóm gợi ý có giới hạn, không phải tìm top trên toàn
+  bộ ứng viên. Tin không yêu cầu kỹ năng không phát thông báo gợi ý.
+- API lấy người nhận từ JWT, không nhận `userId` từ client. Đánh dấu thông báo
+  của người khác trả 404; đánh dấu từng mục/tất cả có thể gọi lặp lại. Danh sách
+  sắp theo thời điểm và mã giảm dần để phân trang ổn định.
+- `ApplicationNotifier` tách use case khỏi kênh gửi. `NotificationService` phát
+  sau khi lưu nghiệp vụ; lỗi phát được ghi log và không làm thất bại thao tác đã
+  lưu. Hiện chưa có hàng đợi, cơ chế thử lại hay bảo đảm giao thông báo khi tiến
+  trình bị dừng giữa chừng. Kênh hiện tại chỉ lưu trong ứng dụng, chưa gửi email.
+- Migration `0005_notifications` tạo bảng cùng index người nhận/chưa đọc và cột
+  kỹ năng chuẩn hóa có GIN index cho ứng viên. Có repository InMemory và PostgreSQL;
+  PostgreSQL lưu cả thông báo và trạng thái đã đọc qua các lần khởi động.
+- `test/notifications.e2e-spec.ts` chạy cùng kịch bản trên hai provider: phát theo
+  nghiệp vụ, phân quyền, chống gửi lại tuần tự, phân trang, lọc và đánh dấu đã đọc.
+  Unit test kiểm tra giới hạn người nhận và lỗi thông báo không làm hỏng nghiệp vụ.
 
 ## Cơ sở dữ liệu
 

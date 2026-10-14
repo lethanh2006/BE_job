@@ -12,7 +12,7 @@ import {
   CompanyRepository,
 } from '../../application/abstractions/persistence';
 import { CompanyNameAlreadyExistsException } from '../../application/exceptions';
-import { UserAccount } from '../../application/auth';
+import { AccountRole, UserAccount } from '../../application/auth';
 import { createDemoAccounts } from '../seed/demo-data';
 
 /** Một lớp triển khai các abstraction về tài khoản (đọc, đăng ký ứng viên/nhà tuyển dụng, bảo mật). */
@@ -57,6 +57,20 @@ export class InMemoryUserAccountRepository
   async findById(id: number): Promise<UserAccount | null> {
     return this.withCompanyName(
       [...this.accounts.values()].find((account) => account.id === id),
+    );
+  }
+
+  findEmployerIds(companyId: number): Promise<number[]> {
+    return Promise.resolve(
+      [...this.accounts.values()]
+        .filter(
+          (account) =>
+            account.role === AccountRole.Employer &&
+            account.companyId === companyId &&
+            !account.disabled,
+        )
+        .map((account) => account.id)
+        .sort((a, b) => a - b),
     );
   }
 

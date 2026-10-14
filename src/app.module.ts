@@ -1,3 +1,6 @@
+import { ApplicationNotifier } from './application/abstractions/notifications';
+import { NotificationService } from './application/notifications/notification.service';
+import { NotificationsController } from './api/controllers/notifications.controller';
 import { DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import {
@@ -39,6 +42,7 @@ import { persistenceProviders } from './infrastructure/persistence/persistence-p
 
 @Module({
   controllers: [
+    NotificationsController,
     HealthController,
     JobsController,
     AuthController,
@@ -61,6 +65,8 @@ import { persistenceProviders } from './infrastructure/persistence/persistence-p
           config.jwt.refreshTokenDays * 24 * 60 * 60 * 1000,
         ),
     },
+    NotificationService,
+    { provide: ApplicationNotifier, useExisting: NotificationService },
     JobMatchService,
     CandidateMatchService,
     JobSearchService,

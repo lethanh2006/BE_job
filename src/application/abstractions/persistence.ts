@@ -30,6 +30,14 @@ export abstract class CandidateRepository implements Repository<Candidate> {
   abstract add(entity: Candidate): Promise<void>;
   abstract update(entity: Candidate): Promise<void>;
   abstract getByIds(ids: readonly number[]): Promise<Candidate[]>;
+  /**
+   * Ứng viên có ít nhất một trong các kỹ năng (không phân biệt hoa thường và dấu), mã tăng dần.
+   * Dùng để chọn nhóm người nhận thông báo việc làm phù hợp.
+   */
+  abstract findBySkills(
+    skills: readonly string[],
+    limit: number,
+  ): Promise<Candidate[]>;
 }
 
 export abstract class JobApplicationRepository implements Repository<JobApplication> {

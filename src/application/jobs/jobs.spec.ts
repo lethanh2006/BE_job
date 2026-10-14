@@ -1,3 +1,4 @@
+import { makeNotifier } from '../../testing/test-helpers';
 import {
   CompanyStatus,
   JobLevel,
@@ -257,7 +258,13 @@ describe('JobManagementService', () => {
       jobs,
       applications,
       companies,
-      service: new JobManagementService(jobs, applications, companies, clock),
+      service: new JobManagementService(
+        jobs,
+        applications,
+        companies,
+        clock,
+        makeNotifier(),
+      ),
     };
   }
 
@@ -372,6 +379,7 @@ describe('JobManagementService - xem và sửa tin', () => {
         new InMemoryJobApplicationRepository(),
         companies,
         clock,
+        makeNotifier(),
       ),
     };
   }

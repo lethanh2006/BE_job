@@ -1,3 +1,4 @@
+import { foldText } from '../../application/common/text-folding';
 import { Candidate } from '../../domain';
 import { createDemoCandidate } from '../seed/demo-data';
 import { CandidateRepository } from '../../application/abstractions/persistence';
@@ -19,6 +20,19 @@ export class InMemoryCandidateRepository extends CandidateRepository {
 
   getByIds(ids: readonly number[]): Promise<Candidate[]> {
     return Promise.resolve(ids.flatMap((id) => this.candidates.get(id) ?? []));
+  }
+
+  findBySkills(skills: readonly string[], limit: number): Promise<Candidate[]> {
+    const wanted = new Set(skills.map(foldText));
+
+    return Promise.resolve(
+      [...this.candidates.values()]
+        .filter((candidate) =>
+          candidate.skills.some((skill) => wanted.has(foldText(skill.name))),
+        )
+        .sort((a, b) => a.id - b.id)
+        .slice(0, limit),
+    );
   }
 
   add(entity: Candidate): Promise<void> {

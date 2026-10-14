@@ -1,3 +1,4 @@
+import { ApplicationNotifier } from '../abstractions/notifications';
 import { Injectable } from '@nestjs/common';
 import { ArgumentError, Clock } from '../../domain';
 import {
@@ -31,6 +32,7 @@ export class AdminModerationService {
     private readonly refreshTokens: RefreshTokenRepository,
     private readonly audit: AuditLogRepository,
     private readonly clock: Clock,
+    private readonly notifier: ApplicationNotifier,
   ) {}
 
   async takeDownJob(
@@ -43,6 +45,7 @@ export class AdminModerationService {
     job.takeDown(reason);
     await this.jobs.update(job);
     await this.record(actor, 'JobTakenDown', 'Job', jobId, job.removalReason);
+    await this.notifier.jobTakenDown(job);
 
     return toJobResult(job);
   }
@@ -56,6 +59,7 @@ export class AdminModerationService {
     job.reinstate();
     await this.jobs.update(job);
     await this.record(actor, 'JobReinstated', 'Job', jobId, null);
+    await this.notifier.jobReinstated(job);
 
     return toJobResult(job);
   }
@@ -78,6 +82,7 @@ export class AdminModerationService {
       companyId,
       company.suspensionReason ?? null,
     );
+    await this.notifier.companySuspended(company);
 
     return toCompanyResult(company);
   }
@@ -92,6 +97,7 @@ export class AdminModerationService {
     await this.companies.update(company);
     await this.jobs.updateCompanySnapshot(company);
     await this.record(actor, 'CompanyReactivated', 'Company', companyId, null);
+    await this.notifier.companyReactivated(company);
 
     return toCompanyResult(company);
   }

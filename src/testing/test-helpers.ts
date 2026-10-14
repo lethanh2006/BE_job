@@ -1,3 +1,4 @@
+import { ApplicationNotifier } from '../application/abstractions/notifications';
 import { JobRepository } from '../application/abstractions/persistence';
 import {
   Clock,
@@ -110,4 +111,17 @@ export class FakeJobRepository extends JobRepository {
     this.jobs.set(entity.id, entity);
     return Promise.resolve();
   }
+}
+
+/** Bản giả để test use case độc lập với kênh thông báo. */
+export function makeNotifier(): jest.Mocked<ApplicationNotifier> {
+  return {
+    applicationReceived: jest.fn().mockResolvedValue(undefined),
+    applicationStatusChanged: jest.fn().mockResolvedValue(undefined),
+    jobPublished: jest.fn().mockResolvedValue(undefined),
+    jobTakenDown: jest.fn().mockResolvedValue(undefined),
+    jobReinstated: jest.fn().mockResolvedValue(undefined),
+    companySuspended: jest.fn().mockResolvedValue(undefined),
+    companyReactivated: jest.fn().mockResolvedValue(undefined),
+  };
 }

@@ -9,6 +9,8 @@ import {
 export abstract class UserAccountRepository {
   abstract findById(id: number): Promise<UserAccount | null>;
   abstract findByEmail(normalizedEmail: string): Promise<UserAccount | null>;
+  /** Mã các tài khoản nhà tuyển dụng đang hoạt động của một công ty. */
+  abstract findEmployerIds(companyId: number): Promise<number[]>;
 }
 
 export abstract class AccountRegistrationRepository {

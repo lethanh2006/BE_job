@@ -1,8 +1,10 @@
+import { ApplicationNotifier } from '../abstractions/notifications';
 import { Injectable } from '@nestjs/common';
 import {
   Clock,
   CompanyStatus,
   Job,
+  JobStatus,
   JobManagementForbiddenException,
   SalaryRange,
   Skill,
@@ -30,6 +32,7 @@ export class JobManagementService {
     private readonly applications: JobApplicationRepository,
     private readonly companies: CompanyRepository,
     private readonly clock: Clock,
+    private readonly notifier: ApplicationNotifier,
   ) {}
 
   async getByCompanyId(companyId: number): Promise<EmployerJobDto[]> {
@@ -138,8 +141,15 @@ export class JobManagementService {
   ): Promise<EmployerJobDto> {
     const job = await this.getManagedJob(jobId, manager);
 
+    const previousStatus = job.status;
     await change(job);
     await this.jobs.update(job);
+    if (
+      job.status === JobStatus.Published &&
+      previousStatus !== JobStatus.Published
+    ) {
+      await this.notifier.jobPublished(job);
+    }
     const applications = await this.applications.getByJobId(job.id);
 
     return toEmployerJob(job, applications.length);

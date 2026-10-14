@@ -41,6 +41,15 @@ export class PostgresUserAccountRepository
     return rows[0] ? toUserAccount(rows[0]) : null;
   }
 
+  async findEmployerIds(companyId: number): Promise<number[]> {
+    const { rows } = await this.db.query<{ id: number }>(
+      `SELECT id FROM user_accounts
+        WHERE company_id = $1 AND role = 'Employer' AND disabled_at IS NULL ORDER BY id`,
+      [companyId],
+    );
+    return rows.map((row) => row.id);
+  }
+
   async getNextUserId(): Promise<number> {
     const { rows } = await this.db.query<{ id: number }>(
       "SELECT nextval('user_ids')::integer AS id",

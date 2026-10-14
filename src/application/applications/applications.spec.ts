@@ -1,3 +1,4 @@
+import { makeNotifier } from '../../testing/test-helpers';
 import {
   AdminUser,
   AlreadyAppliedException,
@@ -31,7 +32,7 @@ describe('ApplicationService', () => {
   beforeEach(() => {
     jobs = new FakeJobRepository();
     applications = new InMemoryJobApplicationRepository();
-    service = new ApplicationService(jobs, applications, clock);
+    service = new ApplicationService(jobs, applications, clock, makeNotifier());
   });
 
   it('ứng tuyển tin đang đăng tạo đơn Submitted và lưu lại', async () => {
@@ -135,7 +136,12 @@ describe('ApplicationQueryService', () => {
       candidates,
       new JobMatchService(),
     );
-    const apply = new ApplicationService(jobs, applications, clock);
+    const apply = new ApplicationService(
+      jobs,
+      applications,
+      clock,
+      makeNotifier(),
+    );
     await apply.apply(20, 1);
     clock.advanceDays(1);
     await apply.apply(20, 2);
@@ -180,8 +186,18 @@ describe('ApplicationQueryService - phía nhà tuyển dụng', () => {
     );
     candidate.addSkill(new Skill('C#'));
     await candidates.add(candidate);
-    await new ApplicationService(jobs, applications, clock).apply(20, 1);
-    await new ApplicationService(jobs, applications, clock).apply(20, 2);
+    await new ApplicationService(
+      jobs,
+      applications,
+      clock,
+      makeNotifier(),
+    ).apply(20, 1);
+    await new ApplicationService(
+      jobs,
+      applications,
+      clock,
+      makeNotifier(),
+    ).apply(20, 2);
 
     return {
       service: new ApplicationQueryService(

@@ -3,6 +3,7 @@ import {
   AdminReader,
   AuditLogRepository,
 } from '../../application/abstractions/admin';
+import { NotificationRepository } from '../../application/abstractions/notifications';
 import {
   AccountRegistrationRepository,
   AccountSecurityRepository,
@@ -29,6 +30,7 @@ import { PostgresCompanyRepository } from '../postgres/postgres-company-reposito
 import { PostgresJobApplicationRepository } from '../postgres/postgres-job-application-repository';
 import { PostgresJobRepository } from '../postgres/postgres-job-repository';
 import { PostgresJobSearchReader } from '../postgres/postgres-job-search-reader';
+import { PostgresNotificationRepository } from '../postgres/postgres-notification-repository';
 import { PostgresRefreshTokenRepository } from '../postgres/postgres-refresh-token-repository';
 import { PostgresUserAccountRepository } from '../postgres/postgres-user-account-repository';
 import { JOB_SEED_FILE } from '../seed/paths';
@@ -39,6 +41,7 @@ import { InMemoryCompanyRepository } from './in-memory-company-repository';
 import { InMemoryJobApplicationRepository } from './in-memory-job-application-repository';
 import { InMemoryJobRepository } from './in-memory-job-repository';
 import { InMemoryJobSearchReader } from './in-memory-job-search-reader';
+import { InMemoryNotificationRepository } from './in-memory-notification-repository';
 import { InMemoryRefreshTokenRepository } from './in-memory-refresh-token-repository';
 import { InMemoryUserAccountRepository } from './in-memory-user-account-repository';
 
@@ -97,6 +100,10 @@ function inMemoryProviders(): Provider[] {
     },
     ...accountAliases,
     { provide: AuditLogRepository, useClass: InMemoryAuditLogRepository },
+    {
+      provide: NotificationRepository,
+      useClass: InMemoryNotificationRepository,
+    },
     {
       provide: AdminReader,
       inject: [
@@ -163,6 +170,11 @@ function postgresProviders(config: AppConfig): Provider[] {
       provide: AuditLogRepository,
       inject: [Database],
       useFactory: (db: Database) => new PostgresAuditLogRepository(db),
+    },
+    {
+      provide: NotificationRepository,
+      inject: [Database],
+      useFactory: (db: Database) => new PostgresNotificationRepository(db),
     },
     {
       provide: AdminReader,

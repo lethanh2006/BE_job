@@ -1,3 +1,4 @@
+import { ApplicationNotifier } from '../abstractions/notifications';
 import { Injectable } from '@nestjs/common';
 import {
   AlreadyAppliedException,
@@ -20,6 +21,7 @@ export class ApplicationService {
     private readonly jobs: JobRepository,
     private readonly applications: JobApplicationRepository,
     private readonly clock: Clock,
+    private readonly notifier: ApplicationNotifier,
   ) {}
 
   async apply(candidateId: number, jobId: number): Promise<JobApplication> {
@@ -51,6 +53,7 @@ export class ApplicationService {
       this.clock.utcNow,
     );
     await this.applications.add(application);
+    await this.notifier.applicationReceived(job, application);
 
     return application;
   }
@@ -73,8 +76,12 @@ export class ApplicationService {
       );
     }
 
+    const previousStatus = application.status;
     application.changeStatus(status, manager, job);
     await this.applications.update(application);
+    if (application.status !== previousStatus) {
+      await this.notifier.applicationStatusChanged(job, application);
+    }
 
     return application;
   }
