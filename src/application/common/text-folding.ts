@@ -14,5 +14,6 @@ export function foldText(value: string): string {
 
 /** Bỏ ký tự điều khiển (dùng làm dấu phân tách nội bộ trong cột tìm kiếm của database). */
 export function stripControlCharacters(value: string): string {
+  // eslint-disable-next-line no-control-regex -- cố ý loại ký tự điều khiển
   return value.replace(/[\u0000-\u001f\u007f]/g, ' ');
 }
