@@ -33,6 +33,9 @@ function whereClause(criteria: JobSearchCriteria, now: Date) {
     conditions.push(`vn_fold(category) LIKE ${contains(criteria.category)}`);
   }
   if (criteria.level) conditions.push(`level = ${bind(criteria.level)}`);
+  if (criteria.featured !== undefined) {
+    conditions.push(`featured = ${bind(criteria.featured)}`);
+  }
   if (criteria.minimumSalary !== undefined) {
     conditions.push(`salary_min >= ${bind(criteria.minimumSalary)}`);
   }

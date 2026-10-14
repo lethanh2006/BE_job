@@ -98,6 +98,7 @@ export interface SearchJobsQuery {
   location?: string | null;
   category?: string | null;
   level?: JobLevel | null;
+  featured?: boolean | null;
   sort?: JobSortOrder;
 }
 

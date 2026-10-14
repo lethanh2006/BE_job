@@ -47,6 +47,8 @@ export interface JobSearchCriteria {
   category?: string;
   level?: JobLevel;
   minimumSalary?: number;
+  /** Chỉ lấy tin nổi bật. */
+  featured?: boolean;
   /**
    * Tin phải có đủ tất cả kỹ năng này. Đã được `foldText` (không dấu, chữ thường); so khớp chính xác.
    * Từ khóa, địa điểm, lĩnh vực cũng so khớp kiểu "chứa" không phân biệt hoa thường và dấu.

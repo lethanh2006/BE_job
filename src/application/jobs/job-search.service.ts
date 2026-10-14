@@ -38,6 +38,7 @@ export class JobSearchService {
       category: normalizeText(query.category),
       level: query.level ?? undefined,
       minimumSalary: query.minimumSalary ?? undefined,
+      featured: query.featured ?? undefined,
       skills,
       sort: query.sort ?? JobSortOrder.Newest,
       page,

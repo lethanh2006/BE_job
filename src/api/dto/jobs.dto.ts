@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsDate,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -66,6 +67,13 @@ export class SearchJobsQueryDto {
   @IsOptional() @IsEnum(JobLevel) level?: JobLevel;
   /** Chỉ lấy tin có mức lương tối thiểu từ giá trị này. */
   @IsOptional() @Type(() => Number) @IsNumber() minimumSalary?: number;
+  /** `true` chỉ lấy tin nổi bật, `false` chỉ lấy tin thường; bỏ trống để lấy cả hai. */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  featured?: boolean;
   /** Lặp lại tham số để lọc nhiều kỹ năng (phải có đủ tất cả). */
   @IsOptional()
   @Transform(toArray)

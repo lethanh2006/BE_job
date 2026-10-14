@@ -113,6 +113,19 @@ describe.each(backends)('JobBoard API (e2e) — $name', (backend) => {
       expect(res.body.title).toBe('Dữ liệu không hợp lệ');
     });
 
+    it('lọc tin nổi bật', async () => {
+      const featured = await http().get('/api/jobs?featured=true').expect(200);
+      expect(featured.body.totalItems).toBeGreaterThan(0);
+      expect(
+        featured.body.items.every((job: { featured: boolean }) => job.featured),
+      ).toBe(true);
+      const normal = await http().get('/api/jobs?featured=false').expect(200);
+      expect(
+        normal.body.items.every((job: { featured: boolean }) => !job.featured),
+      ).toBe(true);
+      await http().get('/api/jobs?featured=maybe').expect(400);
+    });
+
     it('danh sách lĩnh vực đang tuyển (không nhầm với :id)', async () => {
       const res = await http().get('/api/jobs/categories').expect(200);
       expect(res.body.length).toBeGreaterThan(2);

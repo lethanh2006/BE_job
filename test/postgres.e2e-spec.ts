@@ -453,6 +453,8 @@ describeWithPostgres('Tìm kiếm tin: PostgreSQL khớp bản in-memory', () =>
     ['kỹ năng không dấu', { skills: ['kubernetes'] }],
     ['lĩnh vực chứa chuỗi', { category: 'backend' }],
     ['cấp bậc', { level: JobLevel.Senior }],
+    ['chỉ tin nổi bật', { featured: true }],
+    ['chỉ tin thường', { featured: false }],
     ['lương tối thiểu', { minimumSalary: 2500 }],
     ['một kỹ năng (không phân biệt hoa thường)', { skills: ['kubernetes'] }],
     ['nhiều kỹ năng phải có đủ', { skills: ['nestjs', 'docker'] }],
